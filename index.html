@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelGen - Pixel Art Asset Generator</title>
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>PixelGen</h1>
+
+        <div class="input-group">
+            <label for="input-field">Describe your sprite:</label>
+            <input type="text" id="input-field" placeholder="e.g. a knight with a sword, a red dragon, a treasure chest...">
+            <div class="controls-row">
+                <div class="control">
+                    <label for="sprite-size">Size:</label>
+                    <select id="sprite-size">
+                        <option value="8x8">8×8</option>
+                        <option value="16x16">16×16</option>
+                        <option value="32x32" selected>32×32</option>
+                        <option value="64x64">64×64</option>
+                    </select>
+                </div>
+                <div class="control">
+                    <label for="dither-mode">Dithering:</label>
+                    <select id="dither-mode">
+                        <option value="">None</option>
+                        <option value="FloydSteinberg">Floyd-Steinberg</option>
+                        <option value="Atkinson">Atkinson</option>
+                        <option value="Stucki">Stucki</option>
+                        <option value="Sierra">Sierra</option>
+                        <option value="SierraLite">Sierra Lite</option>
+                    </select>
+                </div>
+                <div class="control">
+                    <label for="show-grid">Grid:</label>
+                    <input type="checkbox" id="show-grid">
+                </div>
+                <button id="generate-btn">Generate</button>
+            </div>
+        </div>
+
+        <div class="output-group">
+            <div class="output-panel">
+                <label>Source (AI generated):</label>
+                <div id="source-output" class="canvas-container">
+                    <img id="source-image" alt="Generated source image" style="display:none;">
+                    <div id="source-placeholder" class="placeholder">Enter a prompt and click Generate</div>
+                </div>
+            </div>
+            <div class="output-panel">
+                <label>NES Pixel Art:</label>
+                <div id="pixel-output" class="canvas-container">
+                    <canvas id="pixel-canvas"></canvas>
+                    <div id="pixel-placeholder" class="placeholder">Pixel art will appear here</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
