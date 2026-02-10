@@ -1,13 +1,14 @@
 /**
  * Image generation service using Pollinations.ai
  *
- * Pollinations.ai provides free, no-auth image generation.
+ * Uses gen.pollinations.ai (the current API) via a Vite dev-server proxy.
+ * The proxy injects the API key server-side so it's never exposed in the browser.
  * We craft a prompt optimized for pixel art / sprite output,
  * then post-process the result through our NES pipeline.
  */
 
-// Proxy through Vite dev server to avoid browser-specific blocks/CORS.
-// Vite rewrites /api/generate/* → https://image.pollinations.ai/prompt/*
+// Proxy through Vite dev server which rewrites & adds auth:
+// /api/generate/* → https://gen.pollinations.ai/image/*
 const POLLINATIONS_BASE = '/api/generate';
 
 /**
@@ -48,7 +49,7 @@ export async function generateImage(prompt, options = {}) {
   const enhancedPrompt = buildPrompt(prompt);
   const encodedPrompt = encodeURIComponent(enhancedPrompt);
 
-  let url = `${POLLINATIONS_BASE}/${encodedPrompt}?width=${width}&height=${height}&nologo=true`;
+  let url = `${POLLINATIONS_BASE}/${encodedPrompt}?model=flux&width=${width}&height=${height}&nologo=true`;
   if (seed !== undefined) {
     url += `&seed=${seed}`;
   }

@@ -12,7 +12,7 @@ test.describe('PixelGen Integration', () => {
 
     // Directly fetch through the proxy and verify we get a valid image
     const response = await page.evaluate(async () => {
-      const res = await fetch('/api/generate/a%20red%20mushroom?width=256&height=256&nologo=true');
+      const res = await fetch('/api/generate/a%20red%20mushroom?model=flux&width=256&height=256&nologo=true');
       const blob = await res.blob();
       return {
         ok: res.ok,
