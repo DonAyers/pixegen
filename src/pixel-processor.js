@@ -1,15 +1,19 @@
 /**
  * Pixel Art Post-Processor
  *
- * Takes a generated image and converts it to NES-compliant pixel art:
- * 1. Downscale to target sprite size using histogram-based sampling
- * 2. Quantize colors to the NES palette
+ * Takes a generated image and converts it to retro-console pixel art:
+ * 1. Downscale to target sprite size using average-based sampling
+ * 2. Quantize colors to the selected console's palette
  * 3. Optionally apply dithering
  * 4. Render to canvas with pixel grid overlay
+ *
+ * Supports two quantization modes:
+ *   - 'palette': Fixed palette quantization via RgbQuant (NES, Genesis, GB, C64, Atari)
+ *   - 'bitreduce': Per-channel bit-depth reduction (SNES 15-bit)
  */
 
 import RgbQuant from 'rgbquant';
-import { NES_PALETTE, SPRITE_SIZES, DEFAULT_SPRITE_SIZE } from './nes-palette.js';
+import { CONSOLES, DEFAULT_CONSOLE, reduceImageTo15Bit } from './palettes.js';
 
 /**
  * Downscale an image to the target pixel art size.
@@ -63,25 +67,26 @@ function downscale(sourceData, targetW, targetH) {
 }
 
 /**
- * Quantize an ImageData to the NES palette using RgbQuant.
+ * Quantize an ImageData to a console's palette using RgbQuant.
  *
  * @param {ImageData} imageData - Input image data (already downscaled)
  * @param {object} options
  * @param {string} options.dithering - Dithering kernel name or null
+ * @param {number[][]} options.palette - Array of [R,G,B] colors
  * @returns {ImageData} - Quantized image data
  */
-function quantize(imageData, options = {}) {
-  const { dithering = null } = options;
+function quantizePalette(imageData, options = {}) {
+  const { dithering = null, palette } = options;
 
   const quant = new RgbQuant({
-    colors: NES_PALETTE.length,
-    palette: NES_PALETTE,
+    colors: palette.length,
+    palette: palette,
     dithKern: dithering,
     dithSerp: true,
     reIndex: false,
   });
 
-  // Reduce to NES palette (returns Uint8Array of RGBA)
+  // Reduce to palette (returns Uint8Array of RGBA)
   const reduced = quant.reduce(imageData, 1);
 
   const result = new ImageData(imageData.width, imageData.height);
@@ -90,24 +95,48 @@ function quantize(imageData, options = {}) {
 }
 
 /**
- * Full pipeline: take an HTMLImageElement and produce NES pixel art.
+ * Quantize via bit-depth reduction (e.g. SNES 15-bit).
+ *
+ * @param {ImageData} imageData - Input image data
+ * @param {object} options
+ * @param {string} options.dithering - Dithering kernel (used for pre-dither, then reduce)
+ * @returns {ImageData} - Quantized image data
+ */
+function quantizeBitReduce(imageData, options = {}) {
+  const result = new ImageData(
+    new Uint8ClampedArray(imageData.data),
+    imageData.width,
+    imageData.height
+  );
+  reduceImageTo15Bit(result.data);
+  return result;
+}
+
+/**
+ * Full pipeline: take an HTMLImageElement and produce retro pixel art.
  *
  * @param {HTMLImageElement} img - Source image
  * @param {object} options
- * @param {string} options.spriteSize - Key from SPRITE_SIZES (default '32x32')
+ * @param {string} options.consoleId - Console key from CONSOLES (default: DEFAULT_CONSOLE)
+ * @param {string} options.spriteSize - Sprite size key (default: console's default)
  * @param {string|null} options.dithering - Dithering kernel or null
  * @returns {{ pixelData: ImageData, spriteW: number, spriteH: number }}
  */
 export function processImage(img, options = {}) {
   const {
-    spriteSize = DEFAULT_SPRITE_SIZE,
+    consoleId = DEFAULT_CONSOLE,
+    spriteSize,
     dithering = null,
   } = options;
 
-  const size = SPRITE_SIZES[spriteSize];
-  if (!size) throw new Error(`Unknown sprite size: ${spriteSize}`);
+  const consoleConfig = CONSOLES[consoleId];
+  if (!consoleConfig) throw new Error(`Unknown console: ${consoleId}`);
 
-  const { width: spriteW, height: spriteH } = size;
+  const effectiveSize = spriteSize || consoleConfig.defaultSize;
+  const size = consoleConfig.spriteSizes[effectiveSize];
+  if (!size) throw new Error(`Unknown sprite size "${effectiveSize}" for ${consoleConfig.name}`);
+
+  const { w: spriteW, h: spriteH } = size;
 
   // Use naturalWidth/Height with fallback to width/height
   const imgW = img.naturalWidth || img.width;
@@ -126,8 +155,16 @@ export function processImage(img, options = {}) {
   // Step 1: Downscale
   const downscaled = downscale(sourceData, spriteW, spriteH);
 
-  // Step 2: Quantize to NES palette
-  const pixelData = quantize(downscaled, { dithering });
+  // Step 2: Quantize to console palette
+  let pixelData;
+  if (consoleConfig.quantizeMode === 'bitreduce') {
+    pixelData = quantizeBitReduce(downscaled, { dithering });
+  } else {
+    pixelData = quantizePalette(downscaled, {
+      dithering,
+      palette: consoleConfig.palette,
+    });
+  }
 
   return { pixelData, spriteW, spriteH };
 }

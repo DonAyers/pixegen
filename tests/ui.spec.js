@@ -13,9 +13,14 @@ test.describe('PixelGen UI', () => {
 
     await expect(page.locator('#input-field')).toBeVisible();
     await expect(page.locator('#generate-btn')).toBeVisible();
+    await expect(page.locator('#console-select')).toBeVisible();
     await expect(page.locator('#sprite-size')).toBeVisible();
+    await expect(page.locator('#model-select')).toBeVisible();
     await expect(page.locator('#dither-mode')).toBeVisible();
     await expect(page.locator('#show-grid')).toBeVisible();
+    await expect(page.locator('#transparent-bg')).toBeVisible();
+    await expect(page.locator('#negative-prompt')).toBeVisible();
+    await expect(page.locator('#seed-input')).toBeVisible();
     await expect(page.locator('#pixel-canvas')).toBeAttached();
     await expect(page.locator('#source-placeholder')).toBeVisible();
     await expect(page.locator('#pixel-placeholder')).toBeVisible();
@@ -74,17 +79,44 @@ test.describe('PixelGen UI', () => {
     await expect(page.locator('#pixel-placeholder')).toBeHidden();
   });
 
-  test('should allow changing sprite size and dithering', async ({ page }) => {
+  test('should allow changing controls', async ({ page }) => {
     await page.goto('/');
 
-    await page.locator('#sprite-size').selectOption('16x16');
-    await expect(page.locator('#sprite-size')).toHaveValue('16x16');
+    // Console select defaults to NES and can be changed
+    await expect(page.locator('#console-select')).toHaveValue('nes');
+    await page.locator('#console-select').selectOption('gameboy');
+    await expect(page.locator('#console-select')).toHaveValue('gameboy');
 
+    // Sprite-size should update to valid sizes for the selected console
+    const sizeOptions = await page.locator('#sprite-size option').allTextContents();
+    expect(sizeOptions.length).toBeGreaterThan(0);
+
+    // Dithering
     await page.locator('#dither-mode').selectOption('FloydSteinberg');
     await expect(page.locator('#dither-mode')).toHaveValue('FloydSteinberg');
 
+    // Grid and transparent checkboxes
     await page.locator('#show-grid').check();
     await expect(page.locator('#show-grid')).toBeChecked();
+    await page.locator('#transparent-bg').check();
+    await expect(page.locator('#transparent-bg')).toBeChecked();
+
+    // Negative prompt
+    await page.locator('#negative-prompt').fill('blurry, realistic');
+    await expect(page.locator('#negative-prompt')).toHaveValue('blurry, realistic');
+  });
+
+  test('should update console info on console change', async ({ page }) => {
+    await page.goto('/');
+
+    // Default NES info
+    await expect(page.locator('#console-info')).toContainText('Nintendo Entertainment System');
+    await expect(page.locator('#pixel-label')).toContainText('NES');
+
+    // Switch to Game Boy
+    await page.locator('#console-select').selectOption('gameboy');
+    await expect(page.locator('#console-info')).toContainText('Nintendo Game Boy');
+    await expect(page.locator('#pixel-label')).toContainText('Game Boy');
   });
 
   test('should handle Enter key to generate', async ({ page }) => {

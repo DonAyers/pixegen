@@ -13,16 +13,29 @@
         <div class="input-group">
             <label for="input-field">Describe your sprite:</label>
             <input type="text" id="input-field" placeholder="e.g. a knight with a sword, a red dragon, a treasure chest...">
+
             <div class="controls-row">
+                <div class="control">
+                    <label for="console-select">System:</label>
+                    <select id="console-select">
+                        <!-- populated dynamically from palettes.js -->
+                    </select>
+                </div>
                 <div class="control">
                     <label for="sprite-size">Size:</label>
                     <select id="sprite-size">
-                        <option value="8x8">8×8</option>
-                        <option value="16x16">16×16</option>
-                        <option value="32x32" selected>32×32</option>
-                        <option value="64x64">64×64</option>
+                        <!-- populated dynamically based on selected console -->
                     </select>
                 </div>
+                <div class="control">
+                    <label for="model-select">AI Model:</label>
+                    <select id="model-select">
+                        <!-- populated dynamically from model-service.js -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="controls-row">
                 <div class="control">
                     <label for="dither-mode">Dithering:</label>
                     <select id="dither-mode">
@@ -38,9 +51,26 @@
                     <label for="show-grid">Grid:</label>
                     <input type="checkbox" id="show-grid">
                 </div>
+                <div class="control">
+                    <label for="transparent-bg">Transparent BG:</label>
+                    <input type="checkbox" id="transparent-bg">
+                </div>
                 <button id="generate-btn">Generate</button>
             </div>
+
+            <div class="controls-row negative-prompt-row">
+                <div class="control control-wide">
+                    <label for="negative-prompt">Avoid:</label>
+                    <input type="text" id="negative-prompt" placeholder="blurry, realistic, photographic, 3d render...">
+                </div>
+                <div class="control">
+                    <label for="seed-input">Seed:</label>
+                    <input type="number" id="seed-input" placeholder="random" min="0" max="999999">
+                </div>
+            </div>
         </div>
+
+        <div id="console-info" class="console-info"></div>
 
         <div class="output-group">
             <div class="output-panel">
@@ -51,7 +81,7 @@
                 </div>
             </div>
             <div class="output-panel">
-                <label>NES Pixel Art:</label>
+                <label id="pixel-label">Pixel Art:</label>
                 <div id="pixel-output" class="canvas-container">
                     <canvas id="pixel-canvas"></canvas>
                     <div id="pixel-placeholder" class="placeholder">Pixel art will appear here</div>
