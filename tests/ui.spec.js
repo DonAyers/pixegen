@@ -21,6 +21,13 @@ test.describe('PixelGen UI', () => {
     await expect(page.locator('#transparent-bg')).toBeVisible();
     await expect(page.locator('#negative-prompt')).toBeVisible();
     await expect(page.locator('#seed-input')).toBeVisible();
+    await expect(page.locator('#anim-state')).toBeVisible();
+    await expect(page.locator('#view-select')).toBeVisible();
+    await expect(page.locator('#frame-prev')).toBeVisible();
+    await expect(page.locator('#frame-next')).toBeVisible();
+    await expect(page.locator('#frame-indicator')).toBeVisible();
+    await expect(page.locator('#gen-all-frames')).toBeVisible();
+    await expect(page.locator('#frame-strip')).toBeAttached();
     await expect(page.locator('#pixel-canvas')).toBeAttached();
     await expect(page.locator('#source-placeholder')).toBeVisible();
     await expect(page.locator('#pixel-placeholder')).toBeVisible();
@@ -104,6 +111,16 @@ test.describe('PixelGen UI', () => {
     // Negative prompt
     await page.locator('#negative-prompt').fill('blurry, realistic');
     await expect(page.locator('#negative-prompt')).toHaveValue('blurry, realistic');
+
+    // Animation state selector defaults to idle
+    await expect(page.locator('#anim-state')).toHaveValue('idle');
+    await page.locator('#anim-state').selectOption('walk');
+    await expect(page.locator('#anim-state')).toHaveValue('walk');
+
+    // View selector defaults to side
+    await expect(page.locator('#view-select')).toHaveValue('side');
+    await page.locator('#view-select').selectOption('front');
+    await expect(page.locator('#view-select')).toHaveValue('front');
   });
 
   test('should update console info on console change', async ({ page }) => {
@@ -117,6 +134,21 @@ test.describe('PixelGen UI', () => {
     await page.locator('#console-select').selectOption('gameboy');
     await expect(page.locator('#console-info')).toContainText('Nintendo Game Boy');
     await expect(page.locator('#pixel-label')).toContainText('Game Boy');
+  });
+
+  test('should update frame indicator on animation state change', async ({ page }) => {
+    await page.goto('/');
+
+    // Default idle = 2 frames
+    await expect(page.locator('#frame-indicator')).toContainText('1 / 2');
+
+    // Switch to walk = 4 frames
+    await page.locator('#anim-state').selectOption('walk');
+    await expect(page.locator('#frame-indicator')).toContainText('1 / 4');
+
+    // Switch to crouch = 1 frame
+    await page.locator('#anim-state').selectOption('crouch');
+    await expect(page.locator('#frame-indicator')).toContainText('1 / 1');
   });
 
   test('should handle Enter key to generate', async ({ page }) => {

@@ -70,6 +70,30 @@
             </div>
         </div>
 
+        <div class="controls-row animation-row">
+                <div class="control">
+                    <label for="anim-state">Animation:</label>
+                    <select id="anim-state">
+                        <!-- populated dynamically from animation-states.js -->
+                    </select>
+                </div>
+                <div class="control">
+                    <label for="view-select">View:</label>
+                    <select id="view-select">
+                        <!-- populated dynamically from animation-states.js -->
+                    </select>
+                </div>
+                <div class="control frame-control">
+                    <label>Frame:</label>
+                    <div class="frame-nav">
+                        <button type="button" id="frame-prev" class="frame-btn" title="Previous frame">◀</button>
+                        <span id="frame-indicator">1 / 2</span>
+                        <button type="button" id="frame-next" class="frame-btn" title="Next frame">▶</button>
+                    </div>
+                </div>
+                <button type="button" id="gen-all-frames" class="btn-secondary" title="Generate all frames for this animation">Gen All Frames</button>
+            </div>
+
         <div id="console-info" class="console-info"></div>
 
         <div class="output-group">
@@ -87,6 +111,11 @@
                     <div id="pixel-placeholder" class="placeholder">Pixel art will appear here</div>
                 </div>
             </div>
+        </div>
+
+        <div class="frame-strip-section">
+            <label>Frames:</label>
+            <div id="frame-strip" class="frame-strip"></div>
         </div>
 
         <div id="status" class="status"></div>

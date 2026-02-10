@@ -20,10 +20,19 @@ const POLLINATIONS_BASE = '/api/generate';
  * @param {string} options.poseDesc - Optional pose/view description
  */
 function buildPrompt(userPrompt, options = {}) {
-  const { consoleName = '', poseDesc = '' } = options;
+  const { consoleName = '', poseDesc = '', animState = '', frameHint = '' } = options;
   const parts = [userPrompt];
 
+  // Pose / view / animation context comes first for best adherence
+  if (poseDesc) {
+    parts.push(poseDesc);
+  } else {
+    if (animState) parts.push(animState);
+    if (frameHint) parts.push(frameHint);
+  }
+
   parts.push('pixel art style');
+  parts.push('single character sprite');
   if (consoleName) {
     parts.push(`${consoleName} era aesthetic`);
   } else {
@@ -32,10 +41,6 @@ function buildPrompt(userPrompt, options = {}) {
   parts.push('simple flat colors');
   parts.push('clean sharp edges');
   parts.push('low detail iconic design');
-
-  if (poseDesc) {
-    parts.push(poseDesc);
-  }
 
   return parts.join(', ');
 }
