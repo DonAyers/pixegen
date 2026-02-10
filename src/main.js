@@ -6,6 +6,9 @@ import {
   ANIMATION_STATES, VIEWS, DEFAULT_STATE, DEFAULT_VIEW,
   buildPoseDescription, getStatesByCategory,
 } from './animation-states.js';
+import { AnimationPlayer } from './animation-player.js';
+import { exportSpriteSheet } from './sprite-sheet.js';
+import { saveAllFrames, loadFrames, listCharacters, listAnimations } from './sprite-storage.js';
 
 // ─── DOM elements ────────────────────────────────────────────────────────────
 const inputField = document.getElementById('input-field');
@@ -32,6 +35,17 @@ const frameNextBtn = document.getElementById('frame-next');
 const frameIndicator = document.getElementById('frame-indicator');
 const genAllFramesBtn = document.getElementById('gen-all-frames');
 const frameStripEl = document.getElementById('frame-strip');
+const previewCanvas = document.getElementById('preview-canvas');
+const previewPlaceholder = document.getElementById('preview-placeholder');
+const playBtn = document.getElementById('play-btn');
+const stopBtn = document.getElementById('stop-btn');
+const fpsInput = document.getElementById('fps-input');
+const pingPongCheckbox = document.getElementById('ping-pong');
+const onionSkinCheckbox = document.getElementById('onion-skin');
+const charNameInput = document.getElementById('char-name');
+const saveFramesBtn = document.getElementById('save-frames-btn');
+const exportSheetBtn = document.getElementById('export-sheet-btn');
+const loadBtn = document.getElementById('load-btn');
 
 // ─── Frame state ─────────────────────────────────────────────────────────────
 // Stores generated pixel art canvases per (state+view) combo.
@@ -54,6 +68,36 @@ function getCurrentFrames() {
 
 function getFrameCount() {
   return ANIMATION_STATES[animStateSelect.value].frameCount;
+}
+
+// ─── Animation Player instance ───────────────────────────────────────────────
+const player = new AnimationPlayer(previewCanvas, {
+  fps: 8,
+  loop: true,
+});
+
+player.onFrameChange = (idx) => {
+  // Highlight the active thumbnail in the frame strip during playback
+  const thumbs = frameStripEl.querySelectorAll('.frame-thumb');
+  // Map player frame index back to the slot index in getCurrentFrames
+  const frames = getCurrentFrames();
+  const filledIndices = frames.map((f, i) => f ? i : -1).filter(i => i >= 0);
+  const slotIdx = filledIndices[idx];
+  thumbs.forEach((t, i) => t.classList.toggle('active', i === slotIdx));
+};
+
+function syncPlayerFrames() {
+  const frames = getCurrentFrames();
+  const filled = frames.filter(f => f !== null);
+  player.setFrames(filled);
+
+  if (filled.length > 0) {
+    previewCanvas.style.display = 'block';
+    previewPlaceholder.style.display = 'none';
+  } else {
+    previewCanvas.style.display = 'none';
+    previewPlaceholder.style.display = '';
+  }
 }
 
 // ─── Populate console selector ───────────────────────────────────────────────
@@ -278,6 +322,7 @@ async function handleGenerate() {
     const frames = getCurrentFrames();
     frames[currentFrame] = { canvas: frameCanvas, pixelData, spriteW, spriteH };
     updateFrameStrip();
+    syncPlayerFrames();
 
     setStatus(`Done! Frame ${currentFrame + 1}/${getFrameCount()} · ${spriteW}×${spriteH} ${consoleCfg.name} sprite.`, 'success');
 
@@ -342,6 +387,7 @@ async function handleGenerateAllFrames() {
     currentFrame = 0;
     updateFrameUI();
     showFrameOnCanvas(0);
+    syncPlayerFrames();
     setStatus(`All ${total} frames generated!`, 'success');
   } catch (err) {
     console.error('Batch generation failed:', err);
@@ -399,6 +445,135 @@ frameNextBtn.addEventListener('click', () => {
 
 genAllFramesBtn.addEventListener('click', handleGenerateAllFrames);
 
+// Playback controls
+playBtn.addEventListener('click', () => {
+  const playing = player.toggle();
+  playBtn.textContent = playing ? '⏸' : '▶';
+});
+
+stopBtn.addEventListener('click', () => {
+  player.stop();
+  playBtn.textContent = '▶';
+});
+
+fpsInput.addEventListener('change', () => {
+  player.fps = Math.max(1, Math.min(30, parseInt(fpsInput.value, 10) || 8));
+  fpsInput.value = player.fps;
+});
+
+pingPongCheckbox.addEventListener('change', () => {
+  player.pingPong = pingPongCheckbox.checked;
+});
+
+onionSkinCheckbox.addEventListener('change', () => {
+  player.onionSkinOpacity = onionSkinCheckbox.checked ? 0.25 : 0;
+});
+
+// Save / Load / Export
+saveFramesBtn.addEventListener('click', async () => {
+  const frames = getCurrentFrames().filter(f => f !== null);
+  if (frames.length === 0) {
+    setStatus('No frames to save. Generate some first.', 'error');
+    return;
+  }
+  const charName = charNameInput.value.trim() || 'untitled';
+  try {
+    setStatus('Saving frames...', 'working');
+    await saveAllFrames(getCurrentFrames(), {
+      characterName: charName,
+      consoleId: consoleSelect.value,
+      animState: animStateSelect.value,
+      view: viewSelect.value,
+      prompt: inputField.value.trim(),
+      model: modelSelect.value,
+    });
+    setStatus(`Saved ${frames.length} frames for "${charName}" (${animStateSelect.value}/${viewSelect.value}).`, 'success');
+  } catch (err) {
+    console.error('Save failed:', err);
+    setStatus(`Save error: ${err.message}`, 'error');
+  }
+});
+
+exportSheetBtn.addEventListener('click', async () => {
+  const frames = getCurrentFrames().filter(f => f !== null);
+  if (frames.length === 0) {
+    setStatus('No frames to export. Generate some first.', 'error');
+    return;
+  }
+  try {
+    const charName = charNameInput.value.trim() || 'sprite';
+    const consoleCfg = CONSOLES[consoleSelect.value];
+    const animState = ANIMATION_STATES[animStateSelect.value];
+    setStatus('Exporting sprite sheet...', 'working');
+    const result = await exportSpriteSheet(frames, {
+      characterName: charName,
+      animName: animStateSelect.value,
+      consoleName: consoleSelect.value,
+      fps: player.fps,
+      loop: animState.loop,
+    });
+    setStatus(`Exported ${result.pngName} + ${result.jsonName} (${frames.length} frames).`, 'success');
+  } catch (err) {
+    console.error('Export failed:', err);
+    setStatus(`Export error: ${err.message}`, 'error');
+  }
+});
+
+loadBtn.addEventListener('click', async () => {
+  const charName = charNameInput.value.trim();
+  if (!charName) {
+    // Show available characters
+    try {
+      const chars = await listCharacters();
+      if (chars.length === 0) {
+        setStatus('No saved characters found.', 'error');
+      } else {
+        setStatus(`Saved characters: ${chars.join(', ')}. Enter a name and click Load.`, 'success');
+      }
+    } catch (err) {
+      setStatus(`Load error: ${err.message}`, 'error');
+    }
+    return;
+  }
+
+  try {
+    setStatus(`Loading "${charName}"...`, 'working');
+    const animState = animStateSelect.value;
+    const view = viewSelect.value;
+    const loaded = await loadFrames(charName, animState, view);
+
+    if (loaded.length === 0) {
+      // Try listing what's available
+      const anims = await listAnimations(charName);
+      if (anims.length === 0) {
+        setStatus(`No saved data for "${charName}".`, 'error');
+      } else {
+        const avail = anims.map(a => `${a.animState}/${a.view} (${a.frameCount}f)`).join(', ');
+        setStatus(`No ${animState}/${view} for "${charName}". Available: ${avail}`, 'error');
+      }
+      return;
+    }
+
+    // Load into frame store
+    const frames = getCurrentFrames();
+    for (const f of loaded) {
+      const idx = f.meta.frame;
+      if (idx < frames.length) {
+        frames[idx] = { canvas: f.canvas, spriteW: f.spriteW, spriteH: f.spriteH };
+      }
+    }
+
+    currentFrame = 0;
+    updateFrameUI();
+    showFrameOnCanvas(0);
+    syncPlayerFrames();
+    setStatus(`Loaded ${loaded.length} frames for "${charName}" (${animState}/${view}).`, 'success');
+  } catch (err) {
+    console.error('Load failed:', err);
+    setStatus(`Load error: ${err.message}`, 'error');
+  }
+});
+
 // Re-process on control changes (no new API call)
 spriteSizeSelect.addEventListener('change', handleReprocess);
 ditherModeSelect.addEventListener('change', handleReprocess);
@@ -412,6 +587,7 @@ populateModelSelect(DEFAULT_MODELS);
 populateAnimStateSelect();
 populateViewSelect();
 updateFrameUI();
+syncPlayerFrames();
 
 // Async: fetch live model list and update dropdown
 fetchImageModels().then((models) => {

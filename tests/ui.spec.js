@@ -28,6 +28,14 @@ test.describe('PixelGen UI', () => {
     await expect(page.locator('#frame-indicator')).toBeVisible();
     await expect(page.locator('#gen-all-frames')).toBeVisible();
     await expect(page.locator('#frame-strip')).toBeAttached();
+    await expect(page.locator('#preview-canvas')).toBeAttached();
+    await expect(page.locator('#play-btn')).toBeVisible();
+    await expect(page.locator('#stop-btn')).toBeVisible();
+    await expect(page.locator('#fps-input')).toBeVisible();
+    await expect(page.locator('#char-name')).toBeVisible();
+    await expect(page.locator('#save-frames-btn')).toBeVisible();
+    await expect(page.locator('#export-sheet-btn')).toBeVisible();
+    await expect(page.locator('#load-btn')).toBeVisible();
     await expect(page.locator('#pixel-canvas')).toBeAttached();
     await expect(page.locator('#source-placeholder')).toBeVisible();
     await expect(page.locator('#pixel-placeholder')).toBeVisible();
@@ -149,6 +157,21 @@ test.describe('PixelGen UI', () => {
     // Switch to crouch = 1 frame
     await page.locator('#anim-state').selectOption('crouch');
     await expect(page.locator('#frame-indicator')).toContainText('1 / 1');
+  });
+
+  test('should show preview placeholder when no frames generated', async ({ page }) => {
+    await page.goto('/');
+
+    // Preview placeholder should be visible, canvas hidden
+    await expect(page.locator('#preview-placeholder')).toBeVisible();
+
+    // FPS can be changed
+    await page.locator('#fps-input').fill('12');
+    await expect(page.locator('#fps-input')).toHaveValue('12');
+
+    // Character name input works
+    await page.locator('#char-name').fill('test-knight');
+    await expect(page.locator('#char-name')).toHaveValue('test-knight');
   });
 
   test('should handle Enter key to generate', async ({ page }) => {
