@@ -30,6 +30,7 @@ test.describe('PixelGen UI', () => {
     await expect(page.locator('#frame-next')).toBeVisible();
     await expect(page.locator('#frame-indicator')).toBeVisible();
     await expect(page.locator('#gen-all-frames')).toBeVisible();
+    await expect(page.locator('#gen-sheet')).toBeVisible();
     await expect(page.locator('#frame-strip')).toBeAttached();
     await expect(page.locator('#preview-canvas')).toBeAttached();
     await expect(page.locator('#play-btn')).toBeVisible();
@@ -201,5 +202,35 @@ test.describe('PixelGen UI', () => {
 
     // Should start generating and finish
     await expect(page.locator('#status')).toContainText('Done!', { timeout: 15000 });
+  });
+
+  test('should generate sprite sheet and populate all frames', async ({ page }) => {
+    // Create a wider test PNG (8x4) to simulate a 2-frame sprite sheet
+    await page.route('**/api/generate/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: getTestPngBuffer(),
+      });
+    });
+
+    await page.goto('/');
+
+    // Default idle has 2 frames
+    await expect(page.locator('#frame-indicator')).toContainText('1 / 2');
+
+    await page.locator('#input-field').fill('a red knight');
+    await page.locator('#gen-sheet').click();
+
+    // Should complete and show success
+    await expect(page.locator('#status')).toContainText('Done!', { timeout: 15000 });
+    await expect(page.locator('#status')).toContainText('sprite sheet');
+
+    // Both frame thumbnails should be filled (not empty)
+    const filledThumbs = page.locator('.frame-thumb:not(.empty)');
+    await expect(filledThumbs).toHaveCount(2);
+
+    // Pixel canvas should be visible
+    await expect(page.locator('#pixel-canvas')).toBeVisible();
   });
 });

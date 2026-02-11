@@ -374,6 +374,16 @@ button:disabled {
   color: #555;
 }
 
+.btn-accent {
+  background: #3a2a5a;
+  border-color: #9C27B0;
+  color: #CE93D8;
+}
+
+.btn-accent:hover {
+  background: #4a3a6a;
+}
+
 /* Frame strip thumbnails */
 .frame-strip {
   display: flex;

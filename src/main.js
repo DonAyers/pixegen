@@ -1,5 +1,5 @@
-import { generateImage, DEFAULT_NEGATIVE_PROMPT } from './image-service.js';
-import { processImage, renderPixelArt, PIPELINE_MODES, DITHER_OPTIONS } from './pixel-processor.js';
+import { generateImage, generateSpriteSheet, DEFAULT_NEGATIVE_PROMPT } from './image-service.js';
+import { processImage, processSpriteSheet, renderPixelArt, PIPELINE_MODES, DITHER_OPTIONS } from './pixel-processor.js';
 import { CONSOLES, DEFAULT_CONSOLE } from './palettes.js';
 import { fetchImageModels, DEFAULT_MODELS, DEFAULT_MODEL_ID } from './model-service.js';
 import {
@@ -37,6 +37,7 @@ const framePrevBtn = document.getElementById('frame-prev');
 const frameNextBtn = document.getElementById('frame-next');
 const frameIndicator = document.getElementById('frame-indicator');
 const genAllFramesBtn = document.getElementById('gen-all-frames');
+const genSheetBtn = document.getElementById('gen-sheet');
 const frameStripEl = document.getElementById('frame-strip');
 const previewCanvas = document.getElementById('preview-canvas');
 const previewPlaceholder = document.getElementById('preview-placeholder');
@@ -429,6 +430,112 @@ async function handleGenerateAllFrames() {
   }
 }
 
+// ─── Generate entire sprite sheet in one image ───────────────────────────────
+async function handleGenerateSheet() {
+  const prompt = inputField.value.trim();
+  if (!prompt) {
+    setStatus('Please enter a description for your sprite.', 'error');
+    return;
+  }
+
+  const consoleId = consoleSelect.value;
+  const consoleCfg = CONSOLES[consoleId];
+  const spriteSize = spriteSizeSelect.value;
+  const dithering = ditherModeSelect.value || null;
+  const showGrid = showGridCheckbox.checked;
+  const model = modelSelect.value;
+  const transparent = transparentBgCheckbox.checked;
+  const pipelineMode = pipelineModeSelect.value;
+  const outlinesOn = outlinesCheckbox.checked;
+  const cleanupOn = cleanupCheckbox.checked;
+  const negativePrompt = negativePromptInput.value.trim();
+  const seedRaw = seedInput.value.trim();
+  const seed = seedRaw ? parseInt(seedRaw, 10) : undefined;
+
+  const total = getFrameCount();
+  const stateId = animStateSelect.value;
+  const viewId = viewSelect.value;
+  const animState = ANIMATION_STATES[stateId];
+  const view = VIEWS[viewId];
+
+  try {
+    setGenerating(true);
+    genSheetBtn.disabled = true;
+    genAllFramesBtn.disabled = true;
+
+    // Step 1: Generate sprite sheet image (one API call for all frames)
+    setStatus(`Generating ${total}-frame sprite sheet with ${modelSelect.selectedOptions[0]?.textContent || model}...`, 'working');
+    const sheetImg = await generateSpriteSheet(prompt, {
+      model,
+      frameCount: total,
+      seed,
+      transparent,
+      negativePrompt,
+      consoleName: consoleCfg.name,
+      viewDesc: view.promptDesc,
+      animDesc: animState.promptDesc,
+      frameHints: animState.frameHints,
+    });
+
+    // Show the full sheet as the source image
+    await new Promise((resolve, reject) => {
+      sourceImage.onload = resolve;
+      sourceImage.onerror = reject;
+      sourceImage.src = sheetImg.src;
+    });
+    sourceImage.style.display = 'block';
+    sourcePlaceholder.style.display = 'none';
+
+    // Step 2: Slice and process all frames
+    setStatus(`Slicing ${total} frames and processing to ${consoleCfg.name} pixel art...`, 'working');
+    await new Promise(r => setTimeout(r, 50));
+
+    const { frames: processedFrames } = processSpriteSheet(sheetImg, total, {
+      consoleId,
+      spriteSize,
+      dithering,
+      pipeline: pipelineMode,
+      outlines: outlinesOn,
+      cleanup: cleanupOn,
+    });
+
+    // Step 3: Store each frame
+    const storedFrames = getCurrentFrames();
+    for (let i = 0; i < processedFrames.length && i < storedFrames.length; i++) {
+      const { pixelData, spriteW, spriteH } = processedFrames[i];
+
+      // Render to a display canvas
+      const frameCanvas = document.createElement('canvas');
+      renderPixelArt(frameCanvas, pixelData, spriteW, spriteH, { showGrid });
+
+      storedFrames[i] = { canvas: frameCanvas, pixelData, spriteW, spriteH };
+    }
+
+    // Show the first frame on the main canvas
+    currentFrame = 0;
+    if (storedFrames[0]) {
+      const ctx = pixelCanvas.getContext('2d');
+      pixelCanvas.width = storedFrames[0].canvas.width;
+      pixelCanvas.height = storedFrames[0].canvas.height;
+      ctx.drawImage(storedFrames[0].canvas, 0, 0);
+      pixelCanvas.style.display = 'block';
+      pixelPlaceholder.style.display = 'none';
+    }
+
+    updateFrameUI();
+    syncPlayerFrames();
+    setStatus(`Done! ${total}-frame sprite sheet → ${processedFrames[0]?.spriteW}×${processedFrames[0]?.spriteH} ${consoleCfg.name} sprites.`, 'success');
+
+  } catch (err) {
+    console.error('Sheet generation failed:', err);
+    setStatus(`Error: ${err.message}`, 'error');
+  } finally {
+    setGenerating(false);
+    genSheetBtn.disabled = false;
+    genAllFramesBtn.disabled = false;
+  }
+}
+
 // ─── Console change: update sizes, info, and reprocess ───────────────────────
 function handleConsoleChange() {
   populateSpriteSizes();
@@ -476,6 +583,7 @@ frameNextBtn.addEventListener('click', () => {
 });
 
 genAllFramesBtn.addEventListener('click', handleGenerateAllFrames);
+genSheetBtn.addEventListener('click', handleGenerateSheet);
 
 // Playback controls
 playBtn.addEventListener('click', () => {

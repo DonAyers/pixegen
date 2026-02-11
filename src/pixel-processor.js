@@ -505,6 +505,100 @@ export function processImage(img, options = {}) {
 }
 
 /**
+ * Process a sprite sheet image: slice into N frames, process each through
+ * the pixel art pipeline, sharing palette across frames for consistency.
+ *
+ * @param {HTMLImageElement} img - Source sprite sheet image (horizontal strip)
+ * @param {number} frameCount - Number of frames to slice
+ * @param {object} options - Same options as processImage
+ * @returns {{ frames: Array<{ pixelData: ImageData, spriteW: number, spriteH: number }> }}
+ */
+export function processSpriteSheet(img, frameCount, options = {}) {
+  const {
+    consoleId = DEFAULT_CONSOLE,
+    spriteSize,
+    dithering = null,
+    pipeline = 'enhanced',
+    outlines = true,
+    cleanup = true,
+  } = options;
+
+  const consoleConfig = CONSOLES[consoleId];
+  if (!consoleConfig) throw new Error(`Unknown console: ${consoleId}`);
+
+  const effectiveSize = spriteSize || consoleConfig.defaultSize;
+  const size = consoleConfig.spriteSizes[effectiveSize];
+  if (!size) throw new Error(`Unknown sprite size "${effectiveSize}" for ${consoleConfig.name}`);
+
+  const { w: spriteW, h: spriteH } = size;
+  const imgW = img.naturalWidth || img.width;
+  const imgH = img.naturalHeight || img.height;
+
+  if (!imgW || !imgH) {
+    throw new Error(`Image has no dimensions. It may not be fully loaded.`);
+  }
+
+  // Slice the sheet: divide width into frameCount equal columns
+  const frameW = Math.floor(imgW / frameCount);
+  const tmpCanvas = new OffscreenCanvas(imgW, imgH);
+  const tmpCtx = tmpCanvas.getContext('2d');
+  tmpCtx.drawImage(img, 0, 0);
+
+  // Extract palette from first frame for shared palette mode
+  let sharedPaletteOklab = null;
+
+  const frames = [];
+
+  for (let i = 0; i < frameCount; i++) {
+    // Extract this frame's region
+    const frameCanvas = new OffscreenCanvas(frameW, imgH);
+    const frameCtx = frameCanvas.getContext('2d');
+    frameCtx.drawImage(tmpCanvas, i * frameW, 0, frameW, imgH, 0, 0, frameW, imgH);
+    const sourceData = frameCtx.getImageData(0, 0, frameW, imgH);
+
+    // Step 1: Downscale
+    const downscaled = pipeline === 'enhanced'
+      ? downscaleMode(sourceData, spriteW, spriteH)
+      : downscaleAverage(sourceData, spriteW, spriteH);
+
+    // Step 2: Quantize
+    let pixelData;
+    if (consoleConfig.quantizeMode === 'bitreduce') {
+      pixelData = quantizeBitReduce(downscaled);
+    } else if (pipeline === 'enhanced') {
+      // Use shared palette: extract from first frame, reuse for all
+      if (i === 0 && !sharedPaletteOklab) {
+        sharedPaletteOklab = getPaletteOklab(consoleConfig.palette);
+      }
+      if (dithering === 'bayer') {
+        pixelData = quantizeOklabBayer(downscaled, consoleConfig.palette);
+      } else {
+        pixelData = quantizeOklab(downscaled, consoleConfig.palette);
+      }
+    } else {
+      pixelData = quantizePalette(downscaled, {
+        dithering,
+        palette: consoleConfig.palette,
+      });
+    }
+
+    // Step 3: Post-processing
+    if (pipeline === 'enhanced') {
+      if (cleanup) {
+        pixelData = cleanupOrphans(pixelData);
+      }
+      if (outlines) {
+        pixelData = generateOutlines(pixelData);
+      }
+    }
+
+    frames.push({ pixelData, spriteW, spriteH });
+  }
+
+  return { frames };
+}
+
+/**
  * Render pixel art to a visible canvas with optional grid overlay.
  */
 export function renderPixelArt(canvas, pixelData, spriteW, spriteH, options = {}) {
