@@ -30,12 +30,17 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react'
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
 import { generateImage, generateSpriteSheet, DEFAULT_NEGATIVE_PROMPT, lastRequest } from './image-service.js'
 import { processImage, processSpriteSheet, renderPixelArt, DITHER_OPTIONS } from './pixel-processor.js'
 import { CONSOLES, DEFAULT_CONSOLE } from './palettes.js'
-import { fetchImageModels, DEFAULT_MODELS, DEFAULT_MODEL_ID } from './model-service.js'
+import { fetchImageModels, initModels, DEFAULT_MODELS, DEFAULT_MODEL_ID } from './model-service.js'
 import {
   ANIMATION_STATES,
   VIEWS,
@@ -47,6 +52,9 @@ import {
 import { AnimationPlayer } from './animation-player.js'
 import { exportSpriteSheet } from './sprite-sheet.js'
 import { saveAllFrames, loadFrames, listCharacters, listAnimations } from './sprite-storage.js'
+
+// Initialize multi-provider model service
+initModels();
 
 function App() {
   const toast = useToast()
@@ -646,6 +654,15 @@ function App() {
         PixelGen
       </Heading>
       
+      <Tabs colorScheme="brand" variant="enclosed" mb={6}>
+        <TabList>
+          <Tab>Generator</Tab>
+          <Tab>Inspector</Tab>
+        </TabList>
+        
+        <TabPanels>
+          <TabPanel>
+      
       {/* Main Input */}
       <VStack spacing={4} align="stretch" mb={6}>
         <FormControl>
@@ -701,11 +718,28 @@ function App() {
               borderColor="gray.600"
               size="sm"
             >
-              {models.map((m) => (
-                <option key={m.id} value={m.id} title={`${m.description} (${m.cost})`}>
-                  {m.name}
-                </option>
-              ))}
+              {(() => {
+                // Group models by provider
+                const modelsByProvider = {}
+                models.forEach(m => {
+                  const provider = m.providerName || 'Pollinations'
+                  if (!modelsByProvider[provider]) {
+                    modelsByProvider[provider] = []
+                  }
+                  modelsByProvider[provider].push(m)
+                })
+                
+                // Render optgroups
+                return Object.entries(modelsByProvider).map(([providerName, providerModels]) => (
+                  <optgroup key={providerName} label={providerName}>
+                    {providerModels.map((m) => (
+                      <option key={m.fullId || m.id} value={m.fullId || m.id} title={`${m.description} (${m.cost})`}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              })()}
             </Select>
           </FormControl>
         </Flex>
@@ -1159,6 +1193,118 @@ function App() {
           </AccordionPanel>
         </AccordionItem>
       </Accordion>
+          </TabPanel>
+          
+          {/* Inspector Tab */}
+          <TabPanel>
+            <VStack align="stretch" spacing={6}>
+              <Box>
+                <Heading size="md" mb={2} color="brand.500">Request Inspector</Heading>
+                <Text fontSize="sm" color="gray.400">
+                  View raw model input and output from the last generation request.
+                </Text>
+              </Box>
+              
+              {/* Request Details */}
+              <Box bg="background.secondary" p={5} borderRadius="md" borderWidth="1px" borderColor="gray.700">
+                <Heading size="sm" mb={4} color="brand.500">Request Details</Heading>
+                <VStack align="stretch" spacing={3}>
+                  <Flex>
+                    <Text fontSize="sm" fontWeight="bold" color="brand.500" minW="120px">Provider:</Text>
+                    <Text fontSize="sm">{lastRequest.provider || '—'}</Text>
+                  </Flex>
+                  <Flex>
+                    <Text fontSize="sm" fontWeight="bold" color="brand.500" minW="120px">Model:</Text>
+                    <Text fontSize="sm">{lastRequest.model || '—'}</Text>
+                  </Flex>
+                  <Flex>
+                    <Text fontSize="sm" fontWeight="bold" color="brand.500" minW="120px">Type:</Text>
+                    <Text fontSize="sm">{lastRequest.type === 'sheet' ? 'Sprite Sheet' : lastRequest.type === 'single' ? 'Single Frame' : '—'}</Text>
+                  </Flex>
+                  <Flex>
+                    <Text fontSize="sm" fontWeight="bold" color="brand.500" minW="120px">Dimensions:</Text>
+                    <Text fontSize="sm">{lastRequest.width && lastRequest.height ? `${lastRequest.width} × ${lastRequest.height} px` : '—'}</Text>
+                  </Flex>
+                </VStack>
+              </Box>
+              
+              {/* Enhanced Prompt */}
+              <Box bg="background.secondary" p={5} borderRadius="md" borderWidth="1px" borderColor="gray.700">
+                <Heading size="sm" mb={3} color="brand.500">Enhanced Prompt</Heading>
+                <Code
+                  display="block"
+                  whiteSpace="pre-wrap"
+                  p={3}
+                  bg="gray.900"
+                  fontSize="sm"
+                  borderRadius="sm"
+                  maxH="200px"
+                  overflowY="auto"
+                >
+                  {lastRequest.prompt || '—'}
+                </Code>
+              </Box>
+              
+              {/* Negative Prompt */}
+              <Box bg="background.secondary" p={5} borderRadius="md" borderWidth="1px" borderColor="gray.700">
+                <Heading size="sm" mb={3} color="brand.500">Negative Prompt</Heading>
+                <Code
+                  display="block"
+                  whiteSpace="pre-wrap"
+                  p={3}
+                  bg="gray.900"
+                  fontSize="sm"
+                  borderRadius="sm"
+                >
+                  {lastRequest.negativePrompt || '(none)'}
+                </Code>
+              </Box>
+              
+              {/* Request URL */}
+              <Box bg="background.secondary" p={5} borderRadius="md" borderWidth="1px" borderColor="gray.700">
+                <Heading size="sm" mb={3} color="brand.500">Request URL</Heading>
+                <Code
+                  display="block"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-all"
+                  p={3}
+                  bg="gray.900"
+                  fontSize="xs"
+                  borderRadius="sm"
+                  maxH="200px"
+                  overflowY="auto"
+                >
+                  {lastRequest.url || '—'}
+                </Code>
+              </Box>
+              
+              {/* Configuration */}
+              <Box bg="background.secondary" p={5} borderRadius="md" borderWidth="1px" borderColor="gray.700">
+                <Heading size="sm" mb={3} color="brand.500">Configuration</Heading>
+                <Code
+                  display="block"
+                  whiteSpace="pre"
+                  p={3}
+                  bg="gray.900"
+                  fontSize="sm"
+                  borderRadius="sm"
+                >
+                  {JSON.stringify({
+                    console: consoleId,
+                    spriteSize,
+                    pipelineMode,
+                    dithering: ditherMode || 'none',
+                    outlines,
+                    cleanup,
+                    transparent: transparentBg,
+                    seed: seed || 'random',
+                  }, null, 2)}
+                </Code>
+              </Box>
+            </VStack>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Container>
   )
 }
