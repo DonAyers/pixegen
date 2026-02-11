@@ -129,24 +129,3 @@ export function getDefaultModelId() {
   const models = getAllModels();
   return models.length > 0 ? models[0].fullId : 'pollinations:flux';
 }
-
-/**
- * Fetch available providers from the server.
- * This endpoint is added by the Vite proxy to expose which providers are configured.
- * 
- * @returns {Promise<string[]>}
- */
-export async function fetchAvailableProviders() {
-  try {
-    const response = await fetch('/api/providers');
-    if (!response.ok) {
-      console.warn('Failed to fetch providers, using default');
-      return ['pollinations'];
-    }
-    const data = await response.json();
-    return data.providers || ['pollinations'];
-  } catch (err) {
-    console.warn('Error fetching providers:', err);
-    return ['pollinations'];
-  }
-}

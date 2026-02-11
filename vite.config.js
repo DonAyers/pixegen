@@ -4,10 +4,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   
   // Detect available providers based on environment variables
-  const availableProviders = []
-  if (env.POLLINATIONS_API_KEY || !env.GEMINI_API_KEY) {
-    availableProviders.push('pollinations')
-  }
+  // Pollinations is always available (works even without API key)
+  const availableProviders = ['pollinations']
   if (env.GEMINI_API_KEY) {
     availableProviders.push('gemini')
   }
