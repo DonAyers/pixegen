@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
   }
 
   // Gemini proxy (if API key provided)
-  if (env.GEMINI_API_KEY) {
+  if (availableProviders.includes('gemini')) {
     proxyConfig['/api/gemini'] = {
       target: 'https://generativelanguage.googleapis.com',
       changeOrigin: true,
@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => {
   }
 
   // OpenAI proxy (if API key provided)
-  if (env.OPENAI_API_KEY) {
+  if (availableProviders.includes('openai')) {
     proxyConfig['/api/openai'] = {
       target: 'https://api.openai.com',
       changeOrigin: true,
