@@ -946,7 +946,6 @@ function App() {
               ref={pixelCanvasRef}
               style={{
                 imageRendering: 'pixelated',
-                imageRendering: 'crisp-edges',
               }}
             />
           </Box>
@@ -1060,7 +1059,6 @@ function App() {
             ref={previewCanvasRef}
             style={{
               imageRendering: 'pixelated',
-              imageRendering: 'crisp-edges',
             }}
           />
         </Box>
