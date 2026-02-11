@@ -1,14 +1,15 @@
 /**
- * Image generation service using Pollinations.ai
+ * Image generation service supporting multiple providers
  *
- * Uses gen.pollinations.ai (the current API) via a Vite dev-server proxy.
- * The proxy injects the API key server-side so it's never exposed in the browser.
+ * Supports Pollinations, Gemini, OpenAI, and other providers via Vite dev-server proxy.
+ * The proxy injects API keys server-side so they're never exposed in the browser.
  * Supports multiple AI models, transparent backgrounds, and negative prompts.
  */
 
-// Proxy through Vite dev server which rewrites & adds auth:
-// /api/generate/* → https://gen.pollinations.ai/image/*
-const POLLINATIONS_BASE = '/api/generate';
+import { parseModelId, getProviderApiBase } from './provider-service.js';
+
+// Default base for backward compatibility
+const DEFAULT_API_BASE = '/api/pollinations';
 
 /**
  * Last request debug info — updated on every generate call.
@@ -21,6 +22,7 @@ export const lastRequest = {
   width: 0,
   height: 0,
   model: '',
+  provider: '',
   type: '',  // 'single' or 'sheet'
 };
 
@@ -147,7 +149,7 @@ function buildSheetPrompt(userPrompt, options = {}) {
  */
 export async function generateImage(prompt, options = {}) {
   const {
-    model = 'flux',
+    model = 'pollinations:flux',
     width = 512,
     height = 512,
     seed,
@@ -160,7 +162,12 @@ export async function generateImage(prompt, options = {}) {
   const enhancedPrompt = buildPrompt(prompt, { consoleName, poseDesc });
   const encodedPrompt = encodeURIComponent(enhancedPrompt);
 
-  let url = `${POLLINATIONS_BASE}/${encodedPrompt}?model=${encodeURIComponent(model)}&width=${width}&height=${height}&nologo=true&nofeed=true`;
+  // Parse provider and model
+  const { provider, modelId } = parseModelId(model);
+  const apiBase = getProviderApiBase(provider);
+
+  // Build URL based on provider
+  let url = `${apiBase}/${encodedPrompt}?model=${encodeURIComponent(modelId)}&width=${width}&height=${height}&nologo=true&nofeed=true`;
   if (seed !== undefined) {
     url += `&seed=${seed}`;
   }
@@ -178,7 +185,10 @@ export async function generateImage(prompt, options = {}) {
   lastRequest.width = width;
   lastRequest.height = height;
   lastRequest.model = model;
+  lastRequest.provider = provider;
   lastRequest.type = 'single';
+  console.log('[PixelGen] Provider:', provider);
+  console.log('[PixelGen] Model:', modelId);
   console.log('[PixelGen] Prompt:', enhancedPrompt);
   console.log('[PixelGen] URL:', url);
 
@@ -236,7 +246,7 @@ export const SHEET_NEGATIVE_PROMPT =
  */
 export async function generateSpriteSheet(prompt, options = {}) {
   const {
-    model = 'flux',
+    model = 'pollinations:flux',
     frameCount = 4,
     seed,
     transparent = false,
@@ -263,7 +273,11 @@ export async function generateSpriteSheet(prompt, options = {}) {
   const encodedPrompt = encodeURIComponent(enhancedPrompt);
   const effectiveNegative = negativePrompt || SHEET_NEGATIVE_PROMPT;
 
-  let url = `${POLLINATIONS_BASE}/${encodedPrompt}?model=${encodeURIComponent(model)}&width=${width}&height=${height}&nologo=true&nofeed=true`;
+  // Parse provider and model
+  const { provider, modelId } = parseModelId(model);
+  const apiBase = getProviderApiBase(provider);
+
+  let url = `${apiBase}/${encodedPrompt}?model=${encodeURIComponent(modelId)}&width=${width}&height=${height}&nologo=true&nofeed=true`;
   if (seed !== undefined) {
     url += `&seed=${seed}`;
   }
@@ -279,7 +293,10 @@ export async function generateSpriteSheet(prompt, options = {}) {
   lastRequest.width = width;
   lastRequest.height = height;
   lastRequest.model = model;
+  lastRequest.provider = provider;
   lastRequest.type = 'sheet';
+  console.log('[PixelGen] Provider:', provider);
+  console.log('[PixelGen] Model:', modelId);
   console.log('[PixelGen] Sheet Prompt:', enhancedPrompt);
   console.log('[PixelGen] Sheet URL:', url);
 

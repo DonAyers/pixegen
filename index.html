@@ -7,9 +7,20 @@
     <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>PixelGen</h1>
+    <!-- Navigation -->
+    <nav class="nav-bar">
+        <div class="nav-container">
+            <h1 class="nav-title">PixelGen</h1>
+            <div class="nav-links">
+                <button class="nav-link active" data-view="generator">Generator</button>
+                <button class="nav-link" data-view="inspector">Inspector</button>
+            </div>
+        </div>
+    </nav>
 
+    <!-- Generator View -->
+    <div id="generator-view" class="view-container active">
+    <div class="container">
         <div class="input-group">
             <label for="input-field">Describe your sprite:</label>
             <input type="text" id="input-field" placeholder="e.g. a knight with a sword, a red dragon, a treasure chest...">
@@ -188,6 +199,56 @@
             </div>
         </details>
     </div>
+    </div>
+
+    <!-- Inspector View -->
+    <div id="inspector-view" class="view-container">
+        <div class="container">
+            <h2>Request Inspector</h2>
+            <p class="inspector-description">View raw model input and output from the last generation request.</p>
+            
+            <div class="inspector-section">
+                <h3>Request Details</h3>
+                <div class="inspector-field">
+                    <label>Provider:</label>
+                    <div id="inspector-provider" class="inspector-value">—</div>
+                </div>
+                <div class="inspector-field">
+                    <label>Model:</label>
+                    <div id="inspector-model" class="inspector-value">—</div>
+                </div>
+                <div class="inspector-field">
+                    <label>Type:</label>
+                    <div id="inspector-type" class="inspector-value">—</div>
+                </div>
+                <div class="inspector-field">
+                    <label>Dimensions:</label>
+                    <div id="inspector-dimensions" class="inspector-value">—</div>
+                </div>
+            </div>
+
+            <div class="inspector-section">
+                <h3>Enhanced Prompt</h3>
+                <pre id="inspector-prompt" class="inspector-code">—</pre>
+            </div>
+
+            <div class="inspector-section">
+                <h3>Negative Prompt</h3>
+                <pre id="inspector-negative" class="inspector-code">—</pre>
+            </div>
+
+            <div class="inspector-section">
+                <h3>Request URL</h3>
+                <pre id="inspector-url" class="inspector-code">—</pre>
+            </div>
+
+            <div class="inspector-section">
+                <h3>Configuration</h3>
+                <pre id="inspector-config" class="inspector-code">—</pre>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>
