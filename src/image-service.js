@@ -11,6 +11,20 @@
 const POLLINATIONS_BASE = '/api/generate';
 
 /**
+ * Last request debug info — updated on every generate call.
+ * Consumers can read this to display prompt/URL details.
+ */
+export const lastRequest = {
+  prompt: '',
+  negativePrompt: '',
+  url: '',
+  width: 0,
+  height: 0,
+  model: '',
+  type: '',  // 'single' or 'sheet'
+};
+
+/**
  * Smart default negative prompt — avoids common AI generation artifacts
  * that make pixel art conversion harder.
  */
@@ -157,6 +171,17 @@ export async function generateImage(prompt, options = {}) {
     url += `&negative_prompt=${encodeURIComponent(negativePrompt)}`;
   }
 
+  // Store debug info
+  lastRequest.prompt = enhancedPrompt;
+  lastRequest.negativePrompt = negativePrompt;
+  lastRequest.url = url;
+  lastRequest.width = width;
+  lastRequest.height = height;
+  lastRequest.model = model;
+  lastRequest.type = 'single';
+  console.log('[PixelGen] Prompt:', enhancedPrompt);
+  console.log('[PixelGen] URL:', url);
+
   // Fetch the image as a blob so we can handle errors properly
   const response = await fetch(url);
   if (!response.ok) {
@@ -246,6 +271,17 @@ export async function generateSpriteSheet(prompt, options = {}) {
     url += '&transparent=true';
   }
   url += `&negative_prompt=${encodeURIComponent(effectiveNegative)}`;
+
+  // Store debug info
+  lastRequest.prompt = enhancedPrompt;
+  lastRequest.negativePrompt = effectiveNegative;
+  lastRequest.url = url;
+  lastRequest.width = width;
+  lastRequest.height = height;
+  lastRequest.model = model;
+  lastRequest.type = 'sheet';
+  console.log('[PixelGen] Sheet Prompt:', enhancedPrompt);
+  console.log('[PixelGen] Sheet URL:', url);
 
   const response = await fetch(url);
   if (!response.ok) {

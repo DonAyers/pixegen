@@ -31,6 +31,7 @@ test.describe('PixelGen UI', () => {
     await expect(page.locator('#frame-indicator')).toBeVisible();
     await expect(page.locator('#gen-all-frames')).toBeVisible();
     await expect(page.locator('#gen-sheet')).toBeVisible();
+    await expect(page.locator('#prompt-debug')).toBeAttached();
     await expect(page.locator('#frame-strip')).toBeAttached();
     await expect(page.locator('#preview-canvas')).toBeAttached();
     await expect(page.locator('#play-btn')).toBeVisible();

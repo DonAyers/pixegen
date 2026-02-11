@@ -168,6 +168,25 @@
         </div>
 
         <div id="status" class="status"></div>
+
+        <!-- Prompt Debug -->
+        <details id="prompt-debug" class="prompt-debug">
+            <summary>Show Prompt Details</summary>
+            <div class="prompt-debug-content">
+                <div class="prompt-field">
+                    <label>Prompt sent:</label>
+                    <pre id="debug-prompt">—</pre>
+                </div>
+                <div class="prompt-field">
+                    <label>Negative prompt:</label>
+                    <pre id="debug-negative">—</pre>
+                </div>
+                <div class="prompt-field">
+                    <label>Request:</label>
+                    <pre id="debug-url">—</pre>
+                </div>
+            </div>
+        </details>
     </div>
     <script type="module" src="/src/main.js"></script>
 </body>

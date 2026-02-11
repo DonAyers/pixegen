@@ -1,4 +1,4 @@
-import { generateImage, generateSpriteSheet, DEFAULT_NEGATIVE_PROMPT } from './image-service.js';
+import { generateImage, generateSpriteSheet, DEFAULT_NEGATIVE_PROMPT, lastRequest } from './image-service.js';
 import { processImage, processSpriteSheet, renderPixelArt, PIPELINE_MODES, DITHER_OPTIONS } from './pixel-processor.js';
 import { CONSOLES, DEFAULT_CONSOLE } from './palettes.js';
 import { fetchImageModels, DEFAULT_MODELS, DEFAULT_MODEL_ID } from './model-service.js';
@@ -50,6 +50,9 @@ const charNameInput = document.getElementById('char-name');
 const saveFramesBtn = document.getElementById('save-frames-btn');
 const exportSheetBtn = document.getElementById('export-sheet-btn');
 const loadBtn = document.getElementById('load-btn');
+const debugPromptEl = document.getElementById('debug-prompt');
+const debugNegativeEl = document.getElementById('debug-negative');
+const debugUrlEl = document.getElementById('debug-url');
 
 // ─── Frame state ─────────────────────────────────────────────────────────────
 // Stores generated pixel art canvases per (state+view) combo.
@@ -268,6 +271,12 @@ function setGenerating(isGenerating) {
   generateBtn.textContent = isGenerating ? 'Generating...' : 'Generate';
 }
 
+function updatePromptDebug() {
+  debugPromptEl.textContent = lastRequest.prompt || '—';
+  debugNegativeEl.textContent = lastRequest.negativePrompt || '(none)';
+  debugUrlEl.textContent = `${lastRequest.type === 'sheet' ? 'Sheet' : 'Single'} | ${lastRequest.model} | ${lastRequest.width}×${lastRequest.height}\n${lastRequest.url}`;
+}
+
 // ─── Generate handler ────────────────────────────────────────────────────────
 async function handleGenerate() {
   const prompt = inputField.value.trim();
@@ -352,6 +361,7 @@ async function handleGenerate() {
     syncPlayerFrames();
 
     setStatus(`Done! Frame ${currentFrame + 1}/${getFrameCount()} · ${spriteW}×${spriteH} ${consoleCfg.name} sprite.`, 'success');
+    updatePromptDebug();
 
   } catch (err) {
     console.error('Generation failed:', err);
@@ -525,6 +535,7 @@ async function handleGenerateSheet() {
     updateFrameUI();
     syncPlayerFrames();
     setStatus(`Done! ${total}-frame sprite sheet → ${processedFrames[0]?.spriteW}×${processedFrames[0]?.spriteH} ${consoleCfg.name} sprites.`, 'success');
+    updatePromptDebug();
 
   } catch (err) {
     console.error('Sheet generation failed:', err);

@@ -443,3 +443,54 @@ button:disabled {
 .status.success {
   color: #4CAF50;
 }
+
+/* Prompt Debug Panel */
+.prompt-debug {
+  margin-top: 1rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #1a1a2e;
+}
+
+.prompt-debug summary {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: #888;
+  user-select: none;
+}
+
+.prompt-debug summary:hover {
+  color: #bbb;
+}
+
+.prompt-debug-content {
+  padding: 0 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.prompt-field label {
+  display: block;
+  font-size: 0.7rem;
+  color: #666;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.prompt-field pre {
+  margin: 0;
+  padding: 0.5rem;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #ccc;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+}
