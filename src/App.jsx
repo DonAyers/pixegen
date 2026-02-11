@@ -176,7 +176,7 @@ function App() {
   }, [getCurrentFrames])
   
   // Handle generate
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) {
       toast({
         title: 'Please enter a description for your sprite',
@@ -263,7 +263,7 @@ function App() {
     } finally {
       setIsGenerating(false)
     }
-  }
+  }, [prompt, consoleId, ditherMode, modelId, negativePrompt, seed, animState, view, currentFrame, transparentBg, spriteSize, pipelineMode, outlines, cleanup, showGrid, toast, getFrameCount, getCurrentFrames, syncPlayerFrames])
   
   // Handle reprocess
   const handleReprocess = useCallback(() => {
@@ -313,7 +313,7 @@ function App() {
     if (sourceImageSrc) {
       handleReprocess()
     }
-  }, [consoleId, spriteSize, ditherMode, showGrid, pipelineMode, outlines, cleanup])
+  }, [consoleId, spriteSize, ditherMode, showGrid, pipelineMode, outlines, cleanup, sourceImageSrc, handleReprocess])
   
   // Handle generate all frames
   const handleGenerateAllFrames = async () => {
