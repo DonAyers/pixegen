@@ -1,7 +1,7 @@
 import { generateImage, generateSpriteSheet, DEFAULT_NEGATIVE_PROMPT, lastRequest } from './image-service.js';
 import { processImage, processSpriteSheet, renderPixelArt, PIPELINE_MODES, DITHER_OPTIONS } from './pixel-processor.js';
 import { CONSOLES, DEFAULT_CONSOLE } from './palettes.js';
-import { fetchImageModels, DEFAULT_MODELS, DEFAULT_MODEL_ID } from './model-service.js';
+import { initModels, fetchImageModels, DEFAULT_MODELS, DEFAULT_MODEL_ID } from './model-service.js';
 import {
   ANIMATION_STATES, VIEWS, DEFAULT_STATE, DEFAULT_VIEW,
   buildPoseDescription, getStatesByCategory,
@@ -53,6 +53,19 @@ const loadBtn = document.getElementById('load-btn');
 const debugPromptEl = document.getElementById('debug-prompt');
 const debugNegativeEl = document.getElementById('debug-negative');
 const debugUrlEl = document.getElementById('debug-url');
+
+// ─── Navigation elements ─────────────────────────────────────────────────────
+const navLinks = document.querySelectorAll('.nav-link');
+const generatorView = document.getElementById('generator-view');
+const inspectorView = document.getElementById('inspector-view');
+const inspectorProvider = document.getElementById('inspector-provider');
+const inspectorModel = document.getElementById('inspector-model');
+const inspectorType = document.getElementById('inspector-type');
+const inspectorDimensions = document.getElementById('inspector-dimensions');
+const inspectorPrompt = document.getElementById('inspector-prompt');
+const inspectorNegative = document.getElementById('inspector-negative');
+const inspectorUrl = document.getElementById('inspector-url');
+const inspectorConfig = document.getElementById('inspector-config');
 
 // ─── Frame state ─────────────────────────────────────────────────────────────
 // Stores generated pixel art canvases per (state+view) combo.
@@ -169,13 +182,32 @@ function populateDitherOptions() {
 // ─── Populate AI model selector ──────────────────────────────────────────────
 function populateModelSelect(models) {
   modelSelect.innerHTML = '';
+  
+  // Group models by provider
+  const modelsByProvider = {};
   for (const m of models) {
-    const opt = document.createElement('option');
-    opt.value = m.id;
-    opt.textContent = m.name;
-    opt.title = `${m.description} (${m.cost})`;
-    if (m.id === DEFAULT_MODEL_ID) opt.selected = true;
-    modelSelect.appendChild(opt);
+    const provider = m.providerName || 'Pollinations';
+    if (!modelsByProvider[provider]) {
+      modelsByProvider[provider] = [];
+    }
+    modelsByProvider[provider].push(m);
+  }
+  
+  // Create optgroups for each provider
+  for (const [providerName, providerModels] of Object.entries(modelsByProvider)) {
+    const optGroup = document.createElement('optgroup');
+    optGroup.label = providerName;
+    
+    for (const m of providerModels) {
+      const opt = document.createElement('option');
+      opt.value = m.fullId;
+      opt.textContent = m.name;
+      opt.title = `${m.description} (${m.cost})`;
+      if (m.fullId === DEFAULT_MODEL_ID) opt.selected = true;
+      optGroup.appendChild(opt);
+    }
+    
+    modelSelect.appendChild(optGroup);
   }
 }
 
@@ -274,8 +306,76 @@ function setGenerating(isGenerating) {
 function updatePromptDebug() {
   debugPromptEl.textContent = lastRequest.prompt || '—';
   debugNegativeEl.textContent = lastRequest.negativePrompt || '(none)';
-  debugUrlEl.textContent = `${lastRequest.type === 'sheet' ? 'Sheet' : 'Single'} | ${lastRequest.model} | ${lastRequest.width}×${lastRequest.height}\n${lastRequest.url}`;
+  const providerInfo = lastRequest.provider ? `${lastRequest.provider} | ` : '';
+  debugUrlEl.textContent = `${lastRequest.type === 'sheet' ? 'Sheet' : 'Single'} | ${providerInfo}${lastRequest.model} | ${lastRequest.width}×${lastRequest.height}\n${lastRequest.url}`;
+  
+  // Also update inspector view
+  updateInspector();
 }
+
+// ─── Inspector View Management ───────────────────────────────────────────────
+function updateInspector() {
+  if (!lastRequest.url) {
+    inspectorProvider.textContent = '—';
+    inspectorModel.textContent = '—';
+    inspectorType.textContent = '—';
+    inspectorDimensions.textContent = '—';
+    inspectorPrompt.textContent = '—';
+    inspectorNegative.textContent = '—';
+    inspectorUrl.textContent = '—';
+    inspectorConfig.textContent = '—';
+    return;
+  }
+  
+  inspectorProvider.textContent = lastRequest.provider || 'Unknown';
+  inspectorModel.textContent = lastRequest.model || 'Unknown';
+  inspectorType.textContent = lastRequest.type === 'sheet' ? 'Sprite Sheet' : 'Single Frame';
+  inspectorDimensions.textContent = `${lastRequest.width} × ${lastRequest.height} px`;
+  inspectorPrompt.textContent = lastRequest.prompt || '(none)';
+  inspectorNegative.textContent = lastRequest.negativePrompt || '(none)';
+  inspectorUrl.textContent = lastRequest.url;
+  
+  // Build configuration object
+  const config = {
+    console: consoleSelect.value,
+    spriteSize: spriteSizeSelect.value,
+    pipelineMode: pipelineModeSelect.value,
+    dithering: ditherModeSelect.value || 'none',
+    outlines: outlinesCheckbox.checked,
+    cleanup: cleanupCheckbox.checked,
+    transparent: transparentBgCheckbox.checked,
+    seed: seedInput.value || 'random',
+  };
+  inspectorConfig.textContent = JSON.stringify(config, null, 2);
+}
+
+// ─── Navigation handlers ─────────────────────────────────────────────────────
+function switchView(viewName) {
+  // Update navigation
+  navLinks.forEach(link => {
+    if (link.dataset.view === viewName) {
+      link.classList.add('active');
+    } else {
+      link.classList.remove('active');
+    }
+  });
+  
+  // Update views
+  if (viewName === 'generator') {
+    generatorView.classList.add('active');
+    inspectorView.classList.remove('active');
+  } else if (viewName === 'inspector') {
+    generatorView.classList.remove('active');
+    inspectorView.classList.add('active');
+    updateInspector(); // Refresh inspector data
+  }
+}
+
+navLinks.forEach(link => {
+  link.addEventListener('click', () => {
+    switchView(link.dataset.view);
+  });
+});
 
 // ─── Generate handler ────────────────────────────────────────────────────────
 async function handleGenerate() {
@@ -737,6 +837,7 @@ outlinesCheckbox.addEventListener('change', handleReprocess);
 cleanupCheckbox.addEventListener('change', handleReprocess);
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
+initModels(); // Initialize model service with available providers
 populateConsoleSelect();
 populateSpriteSizes();
 updateConsoleInfo();
@@ -755,6 +856,6 @@ fetchImageModels().then((models) => {
   const currentModel = modelSelect.value;
   populateModelSelect(models);
   // Preserve user selection if still available
-  const match = models.find(m => m.id === currentModel);
+  const match = models.find(m => m.fullId === currentModel);
   if (match) modelSelect.value = currentModel;
 });

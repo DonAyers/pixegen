@@ -12,6 +12,74 @@ body {
   color: #e0e0e0;
 }
 
+/* Navigation Bar */
+.nav-bar {
+  background-color: #16213e;
+  border-bottom: 2px solid #4CAF50;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-title {
+  color: #4CAF50;
+  font-size: 1.5rem;
+  letter-spacing: 2px;
+  margin: 0;
+}
+
+.nav-links {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-link {
+  padding: 0.5rem 1.25rem;
+  background: transparent;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.nav-link:focus-visible {
+  outline: 2px solid #4CAF50;
+  outline-offset: 2px;
+}
+.nav-link:hover {
+  background-color: #1a1a2e;
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.nav-link.active {
+  background-color: #4CAF50;
+  border-color: #4CAF50;
+  color: #16213e;
+}
+
+/* View Container */
+.view-container {
+  display: none;
+}
+
+.view-container.active {
+  display: block;
+}
+
 .container {
   max-width: 900px;
   margin: 0 auto;
@@ -23,6 +91,70 @@ h1 {
   color: #4CAF50;
   font-size: 2rem;
   letter-spacing: 2px;
+}
+
+h2 {
+  margin-bottom: 1rem;
+  color: #4CAF50;
+  font-size: 1.5rem;
+}
+
+h3 {
+  margin-bottom: 0.75rem;
+  color: #4CAF50;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* Inspector View Styles */
+.inspector-description {
+  color: #aaa;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+}
+
+.inspector-section {
+  background-color: #16213e;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.inspector-field {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.inspector-field:last-child {
+  margin-bottom: 0;
+}
+
+.inspector-field label {
+  min-width: 120px;
+  font-weight: 600;
+  color: #4CAF50;
+}
+
+.inspector-value {
+  flex: 1;
+  color: #e0e0e0;
+  word-break: break-word;
+}
+
+.inspector-code {
+  background-color: #0f1624;
+  border: 1px solid #2a3f5f;
+  border-radius: 4px;
+  padding: 1rem;
+  color: #e0e0e0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+  overflow-x: auto;
 }
 
 /* Input area */
