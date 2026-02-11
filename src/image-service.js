@@ -164,9 +164,12 @@ export async function generateImage(prompt, options = {}) {
 
   // Parse provider and model
   const { provider, modelId } = parseModelId(model);
-  const apiBase = getProviderApiBase(provider);
 
-  // Build URL based on provider
+  // NOTE: For now, all image generation is routed through the Pollinations backend.
+  // The `provider` field is used for model grouping/display only.
+  const apiBase = DEFAULT_API_BASE;
+
+  // Build Pollinations-style URL
   let url = `${apiBase}/${encodedPrompt}?model=${encodeURIComponent(modelId)}&width=${width}&height=${height}&nologo=true&nofeed=true`;
   if (seed !== undefined) {
     url += `&seed=${seed}`;
