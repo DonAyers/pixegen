@@ -62,7 +62,19 @@ export default defineConfig(({ mode }) => {
   }
 
   // Backward compatibility: /api/generate → pollinations
-  proxyConfig['/api/generate'] = proxyConfig['/api/pollinations']
+  proxyConfig['/api/generate'] = {
+    target: 'https://gen.pollinations.ai',
+    changeOrigin: true,
+    rewrite: (path) => path.replace(/^\/api\/generate/, '/image'),
+    configure: (proxy) => {
+      proxy.on('proxyReq', (proxyReq) => {
+        const apiKey = env.POLLINATIONS_API_KEY || ''
+        if (apiKey) {
+          proxyReq.setHeader('Authorization', `Bearer ${apiKey}`)
+        }
+      })
+    },
+  }
 
   return {
     server: {

@@ -5,7 +5,8 @@ A tool to generate pixel art assets using AI image generation models.
 ## Features
 
 - 🎨 Generate pixel art sprites from text descriptions
-- 🤖 Support for multiple AI providers (Pollinations, Gemini, OpenAI)
+- 🤖 Multiple AI model options through Pollinations API
+- 🔧 Provider-based model organization (UI grouping for future multi-provider support)
 - 🎮 Multiple retro console palettes (NES, SNES, Genesis, Game Boy, etc.)
 - 🎞️ Animation frame generation and preview
 - 🔍 Inspector view to debug model inputs and outputs
@@ -21,19 +22,17 @@ npm install
 
 ### API Keys (Optional)
 
-PixelGen supports multiple AI image generation providers. Copy `.env.example` to `.env` and add your API keys:
+PixelGen uses the Pollinations API for image generation. You can optionally provide an API key:
 
 ```bash
 cp .env.example .env
 ```
 
-Then edit `.env` and add your API keys:
+Then edit `.env` and add your Pollinations API key:
 
 - **Pollinations** (free tier available): Get from [pollinations.ai](https://pollinations.ai)
-- **Google Gemini**: Get from [Google AI Studio](https://aistudio.google.com/app/apikey)
-- **OpenAI**: Get from [OpenAI Platform](https://platform.openai.com/api-keys)
 
-**Note:** At least one provider is always available (Pollinations runs even without an API key). If you provide multiple API keys, all providers will appear grouped in the AI Model dropdown.
+**Note:** The application works without an API key. The UI includes provider-based model grouping (Gemini, OpenAI) as a display feature for future multi-provider support, but currently all models are served through the Pollinations backend.
 
 ## Development
 

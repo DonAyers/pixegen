@@ -234,4 +234,49 @@ test.describe('PixelGen UI', () => {
     // Pixel canvas should be visible
     await expect(page.locator('#pixel-canvas')).toBeVisible();
   });
+
+  test('should navigate to Inspector view and display request details', async ({ page }) => {
+    // Mock image generation
+    await page.route('**/api/generate/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: getTestPngBuffer(),
+      });
+    });
+
+    await page.goto('/');
+
+    // Initially on generator view
+    await expect(page.locator('#generator-view')).toHaveClass(/active/);
+    await expect(page.locator('#inspector-view')).not.toHaveClass(/active/);
+
+    // Generate an image to populate lastRequest
+    await page.locator('#input-field').fill('a red knight');
+    await page.locator('#generate-btn').click();
+    await expect(page.locator('#status')).toContainText('Done!', { timeout: 15000 });
+
+    // Click Inspector nav button
+    const inspectorBtn = page.locator('.nav-link[data-view="inspector"]');
+    await expect(inspectorBtn).toBeVisible();
+    await inspectorBtn.click();
+
+    // Inspector view should be active, generator hidden
+    await expect(page.locator('#inspector-view')).toHaveClass(/active/);
+    await expect(page.locator('#generator-view')).not.toHaveClass(/active/);
+
+    // Verify inspector fields are populated from lastRequest
+    await expect(page.locator('#inspector-provider')).not.toContainText('—');
+    await expect(page.locator('#inspector-model')).not.toContainText('—');
+    await expect(page.locator('#inspector-type')).toContainText('Single');
+    await expect(page.locator('#inspector-dimensions')).toContainText('512');
+    await expect(page.locator('#inspector-prompt')).not.toContainText('—');
+    await expect(page.locator('#inspector-url')).toContainText('/api/');
+
+    // Click back to Generator
+    const generatorBtn = page.locator('.nav-link[data-view="generator"]');
+    await generatorBtn.click();
+    await expect(page.locator('#generator-view')).toHaveClass(/active/);
+    await expect(page.locator('#inspector-view')).not.toHaveClass(/active/);
+  });
 });
