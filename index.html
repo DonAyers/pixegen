@@ -37,14 +37,16 @@
 
             <div class="controls-row">
                 <div class="control">
+                    <label for="pipeline-mode">Pipeline:</label>
+                    <select id="pipeline-mode">
+                        <option value="enhanced" selected>Enhanced (OKLAB)</option>
+                        <option value="classic">Classic (sRGB)</option>
+                    </select>
+                </div>
+                <div class="control">
                     <label for="dither-mode">Dithering:</label>
                     <select id="dither-mode">
-                        <option value="">None</option>
-                        <option value="FloydSteinberg">Floyd-Steinberg</option>
-                        <option value="Atkinson">Atkinson</option>
-                        <option value="Stucki">Stucki</option>
-                        <option value="Sierra">Sierra</option>
-                        <option value="SierraLite">Sierra Lite</option>
+                        <!-- populated dynamically based on pipeline mode -->
                     </select>
                 </div>
                 <div class="control">
@@ -54,6 +56,14 @@
                 <div class="control">
                     <label for="transparent-bg">Transparent BG:</label>
                     <input type="checkbox" id="transparent-bg">
+                </div>
+                <div class="control">
+                    <label for="outlines">Outlines:</label>
+                    <input type="checkbox" id="outlines" checked>
+                </div>
+                <div class="control">
+                    <label for="cleanup">Cleanup:</label>
+                    <input type="checkbox" id="cleanup" checked>
                 </div>
                 <button id="generate-btn">Generate</button>
             </div>

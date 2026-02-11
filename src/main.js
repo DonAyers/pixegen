@@ -1,5 +1,5 @@
-import { generateImage } from './image-service.js';
-import { processImage, renderPixelArt } from './pixel-processor.js';
+import { generateImage, DEFAULT_NEGATIVE_PROMPT } from './image-service.js';
+import { processImage, renderPixelArt, PIPELINE_MODES, DITHER_OPTIONS } from './pixel-processor.js';
 import { CONSOLES, DEFAULT_CONSOLE } from './palettes.js';
 import { fetchImageModels, DEFAULT_MODELS, DEFAULT_MODEL_ID } from './model-service.js';
 import {
@@ -17,8 +17,11 @@ const consoleSelect = document.getElementById('console-select');
 const spriteSizeSelect = document.getElementById('sprite-size');
 const modelSelect = document.getElementById('model-select');
 const ditherModeSelect = document.getElementById('dither-mode');
+const pipelineModeSelect = document.getElementById('pipeline-mode');
 const showGridCheckbox = document.getElementById('show-grid');
 const transparentBgCheckbox = document.getElementById('transparent-bg');
+const outlinesCheckbox = document.getElementById('outlines');
+const cleanupCheckbox = document.getElementById('cleanup');
 const negativePromptInput = document.getElementById('negative-prompt');
 const seedInput = document.getElementById('seed-input');
 const consoleInfoEl = document.getElementById('console-info');
@@ -142,6 +145,23 @@ function updateConsoleInfo() {
   pixelLabel.textContent = `${cfg.name} Pixel Art:`;
 }
 
+// ─── Populate dither options based on pipeline mode ──────────────────────────
+function populateDitherOptions() {
+  const mode = pipelineModeSelect.value;
+  const options = DITHER_OPTIONS[mode] || DITHER_OPTIONS.enhanced;
+  const currentValue = ditherModeSelect.value;
+  ditherModeSelect.innerHTML = '';
+  for (const opt of options) {
+    const el = document.createElement('option');
+    el.value = opt.value;
+    el.textContent = opt.label;
+    ditherModeSelect.appendChild(el);
+  }
+  // Try to preserve current selection
+  const exists = options.some(o => o.value === currentValue);
+  ditherModeSelect.value = exists ? currentValue : '';
+}
+
 // ─── Populate AI model selector ──────────────────────────────────────────────
 function populateModelSelect(models) {
   modelSelect.innerHTML = '';
@@ -262,7 +282,10 @@ async function handleGenerate() {
   const showGrid = showGridCheckbox.checked;
   const model = modelSelect.value;
   const transparent = transparentBgCheckbox.checked;
-  const negativePrompt = negativePromptInput.value.trim();
+  const pipelineMode = pipelineModeSelect.value;
+  const outlinesOn = outlinesCheckbox.checked;
+  const cleanupOn = cleanupCheckbox.checked;
+  const negativePrompt = negativePromptInput.value.trim() || DEFAULT_NEGATIVE_PROMPT;
   const seedRaw = seedInput.value.trim();
   const seed = seedRaw ? parseInt(seedRaw, 10) : undefined;
 
@@ -303,6 +326,9 @@ async function handleGenerate() {
       consoleId,
       spriteSize,
       dithering,
+      pipeline: pipelineMode,
+      outlines: outlinesOn,
+      cleanup: cleanupOn,
     });
 
     // Step 3: Render to canvas
@@ -343,12 +369,18 @@ function handleReprocess() {
   const spriteSize = spriteSizeSelect.value;
   const dithering = ditherModeSelect.value || null;
   const showGrid = showGridCheckbox.checked;
+  const pipelineMode = pipelineModeSelect.value;
+  const outlinesOn = outlinesCheckbox.checked;
+  const cleanupOn = cleanupCheckbox.checked;
 
   try {
     const { pixelData, spriteW, spriteH } = processImage(sourceImage, {
       consoleId,
       spriteSize,
       dithering,
+      pipeline: pipelineMode,
+      outlines: outlinesOn,
+      cleanup: cleanupOn,
     });
 
     renderPixelArt(pixelCanvas, pixelData, spriteW, spriteH, {
@@ -578,6 +610,12 @@ loadBtn.addEventListener('click', async () => {
 spriteSizeSelect.addEventListener('change', handleReprocess);
 ditherModeSelect.addEventListener('change', handleReprocess);
 showGridCheckbox.addEventListener('change', handleReprocess);
+pipelineModeSelect.addEventListener('change', () => {
+  populateDitherOptions();
+  handleReprocess();
+});
+outlinesCheckbox.addEventListener('change', handleReprocess);
+cleanupCheckbox.addEventListener('change', handleReprocess);
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
 populateConsoleSelect();
@@ -586,8 +624,12 @@ updateConsoleInfo();
 populateModelSelect(DEFAULT_MODELS);
 populateAnimStateSelect();
 populateViewSelect();
+populateDitherOptions();
 updateFrameUI();
 syncPlayerFrames();
+
+// Set smart default negative prompt as placeholder
+negativePromptInput.placeholder = DEFAULT_NEGATIVE_PROMPT;
 
 // Async: fetch live model list and update dropdown
 fetchImageModels().then((models) => {

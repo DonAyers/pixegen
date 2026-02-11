@@ -11,19 +11,42 @@
 const POLLINATIONS_BASE = '/api/generate';
 
 /**
- * Enhance a user prompt with pixel-art-specific instructions
- * to nudge the model toward better base images for post-processing.
+ * Smart default negative prompt — avoids common AI generation artifacts
+ * that make pixel art conversion harder.
+ */
+export const DEFAULT_NEGATIVE_PROMPT =
+  'blurry, soft focus, photorealistic, 3d render, gradient shading, anti-aliasing, ' +
+  'smooth edges, detailed background, text, watermark, signature, frame, border';
+
+/**
+ * Enhance a user prompt with pixel-art-specific instructions.
+ * Style tokens go FIRST for best model adherence, then subject, then context.
  *
  * @param {string} userPrompt - User's text description
  * @param {object} options
- * @param {string} options.consoleName - Display name of target console (e.g. 'NES', 'SNES')
+ * @param {string} options.consoleName - Display name of target console
  * @param {string} options.poseDesc - Optional pose/view description
  */
 function buildPrompt(userPrompt, options = {}) {
   const { consoleName = '', poseDesc = '', animState = '', frameHint = '' } = options;
-  const parts = [userPrompt];
+  const parts = [];
 
-  // Pose / view / animation context comes first for best adherence
+  // Style tokens FIRST — models give most weight to early tokens
+  parts.push('pixel art sprite');
+  parts.push('game asset');
+  if (consoleName) {
+    parts.push(`${consoleName} era aesthetic`);
+  } else {
+    parts.push('retro game sprite');
+  }
+  parts.push('flat colors');
+  parts.push('clean sharp edges');
+  parts.push('iconic design');
+
+  // Subject
+  parts.push(userPrompt);
+
+  // Pose / view context
   if (poseDesc) {
     parts.push(poseDesc);
   } else {
@@ -31,16 +54,7 @@ function buildPrompt(userPrompt, options = {}) {
     if (frameHint) parts.push(frameHint);
   }
 
-  parts.push('pixel art style');
-  parts.push('single character sprite');
-  if (consoleName) {
-    parts.push(`${consoleName} era aesthetic`);
-  } else {
-    parts.push('retro game sprite');
-  }
-  parts.push('simple flat colors');
-  parts.push('clean sharp edges');
-  parts.push('low detail iconic design');
+  parts.push('single character centered on solid background');
 
   return parts.join(', ');
 }
@@ -51,8 +65,8 @@ function buildPrompt(userPrompt, options = {}) {
  * @param {string} prompt - User's text description
  * @param {object} options
  * @param {string}  options.model - AI model to use (default: 'flux')
- * @param {number}  options.width - Image width to request (default 256)
- * @param {number}  options.height - Image height to request (default 256)
+ * @param {number}  options.width - Image width to request (default 512)
+ * @param {number}  options.height - Image height to request (default 512)
  * @param {number}  options.seed - Optional seed for reproducibility
  * @param {boolean} options.transparent - Request transparent background
  * @param {string}  options.negativePrompt - Things to avoid in generation
@@ -63,8 +77,8 @@ function buildPrompt(userPrompt, options = {}) {
 export async function generateImage(prompt, options = {}) {
   const {
     model = 'flux',
-    width = 256,
-    height = 256,
+    width = 512,
+    height = 512,
     seed,
     transparent = false,
     negativePrompt = '',

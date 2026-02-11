@@ -23,6 +23,9 @@ test.describe('PixelGen UI', () => {
     await expect(page.locator('#seed-input')).toBeVisible();
     await expect(page.locator('#anim-state')).toBeVisible();
     await expect(page.locator('#view-select')).toBeVisible();
+    await expect(page.locator('#pipeline-mode')).toBeVisible();
+    await expect(page.locator('#outlines')).toBeVisible();
+    await expect(page.locator('#cleanup')).toBeVisible();
     await expect(page.locator('#frame-prev')).toBeVisible();
     await expect(page.locator('#frame-next')).toBeVisible();
     await expect(page.locator('#frame-indicator')).toBeVisible();
@@ -106,9 +109,18 @@ test.describe('PixelGen UI', () => {
     const sizeOptions = await page.locator('#sprite-size option').allTextContents();
     expect(sizeOptions.length).toBeGreaterThan(0);
 
-    // Dithering
-    await page.locator('#dither-mode').selectOption('FloydSteinberg');
-    await expect(page.locator('#dither-mode')).toHaveValue('FloydSteinberg');
+    // Dithering — enhanced mode shows Bayer option
+    await expect(page.locator('#pipeline-mode')).toHaveValue('enhanced');
+    const ditherOpts = await page.locator('#dither-mode option').allTextContents();
+    expect(ditherOpts).toContain('Bayer 4×4 (pixel art style)');
+
+    // Switch to classic mode — dithering options should change
+    await page.locator('#pipeline-mode').selectOption('classic');
+    const classicDitherOpts = await page.locator('#dither-mode option').allTextContents();
+    expect(classicDitherOpts).toContain('Floyd-Steinberg');
+
+    // Switch back to enhanced
+    await page.locator('#pipeline-mode').selectOption('enhanced');
 
     // Grid and transparent checkboxes
     await page.locator('#show-grid').check();
