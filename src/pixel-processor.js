@@ -21,6 +21,7 @@
 
 import RgbQuant from 'rgbquant';
 import { CONSOLES, DEFAULT_CONSOLE, reduceImageTo15Bit } from './palettes.js';
+import { preprocessImage, PREPROCESSING_PRESETS } from './image-preprocessor.js';
 
 // ─── OKLAB Color Space ───────────────────────────────────────────────────────
 // OKLAB is perceptually uniform — Euclidean distance in OKLAB corresponds to
@@ -409,6 +410,11 @@ export const PIPELINE_MODES = [
 ];
 
 /**
+ * Export preprocessing presets for UI
+ */
+export { PREPROCESSING_PRESETS };
+
+/**
  * Available dithering options per pipeline mode.
  */
 export const DITHER_OPTIONS = {
@@ -437,9 +443,10 @@ export const DITHER_OPTIONS = {
  * @param {string} options.pipeline - 'enhanced' or 'classic'
  * @param {boolean} options.outlines - Generate auto-outlines
  * @param {boolean} options.cleanup - Clean orphan pixels
- * @returns {{ pixelData: ImageData, spriteW: number, spriteH: number }}
+ * @param {object|null} options.preprocessing - Preprocessing options (from PREPROCESSING_PRESETS)
+ * @returns {Promise<{ pixelData: ImageData, spriteW: number, spriteH: number }>}
  */
-export function processImage(img, options = {}) {
+export async function processImage(img, options = {}) {
   const {
     consoleId = DEFAULT_CONSOLE,
     spriteSize,
@@ -447,7 +454,14 @@ export function processImage(img, options = {}) {
     pipeline = 'enhanced',
     outlines = true,
     cleanup = true,
+    preprocessing = null,
   } = options;
+
+  // Apply preprocessing if requested
+  let processedImg = img;
+  if (preprocessing && preprocessing.enabled !== false) {
+    processedImg = await preprocessImage(img, preprocessing);
+  }
 
   const consoleConfig = CONSOLES[consoleId];
   if (!consoleConfig) throw new Error(`Unknown console: ${consoleId}`);
@@ -457,8 +471,8 @@ export function processImage(img, options = {}) {
   if (!size) throw new Error(`Unknown sprite size "${effectiveSize}" for ${consoleConfig.name}`);
 
   const { w: spriteW, h: spriteH } = size;
-  const imgW = img.naturalWidth || img.width;
-  const imgH = img.naturalHeight || img.height;
+  const imgW = processedImg.naturalWidth || processedImg.width;
+  const imgH = processedImg.naturalHeight || processedImg.height;
 
   if (!imgW || !imgH) {
     throw new Error(`Image has no dimensions (${imgW}x${imgH}). It may not be fully loaded.`);
@@ -466,7 +480,7 @@ export function processImage(img, options = {}) {
 
   const tmpCanvas = new OffscreenCanvas(imgW, imgH);
   const tmpCtx = tmpCanvas.getContext('2d');
-  tmpCtx.drawImage(img, 0, 0);
+  tmpCtx.drawImage(processedImg, 0, 0);
   const sourceData = tmpCtx.getImageData(0, 0, imgW, imgH);
 
   // Step 1: Downscale
@@ -511,9 +525,9 @@ export function processImage(img, options = {}) {
  * @param {HTMLImageElement} img - Source sprite sheet image (horizontal strip)
  * @param {number} frameCount - Number of frames to slice
  * @param {object} options - Same options as processImage
- * @returns {{ frames: Array<{ pixelData: ImageData, spriteW: number, spriteH: number }> }}
+ * @returns {Promise<{ frames: Array<{ pixelData: ImageData, spriteW: number, spriteH: number }> }>}
  */
-export function processSpriteSheet(img, frameCount, options = {}) {
+export async function processSpriteSheet(img, frameCount, options = {}) {
   const {
     consoleId = DEFAULT_CONSOLE,
     spriteSize,
@@ -521,7 +535,14 @@ export function processSpriteSheet(img, frameCount, options = {}) {
     pipeline = 'enhanced',
     outlines = true,
     cleanup = true,
+    preprocessing = null,
   } = options;
+
+  // Apply preprocessing if requested
+  let processedImg = img;
+  if (preprocessing && preprocessing.enabled !== false) {
+    processedImg = await preprocessImage(img, preprocessing);
+  }
 
   const consoleConfig = CONSOLES[consoleId];
   if (!consoleConfig) throw new Error(`Unknown console: ${consoleId}`);
@@ -531,8 +552,8 @@ export function processSpriteSheet(img, frameCount, options = {}) {
   if (!size) throw new Error(`Unknown sprite size "${effectiveSize}" for ${consoleConfig.name}`);
 
   const { w: spriteW, h: spriteH } = size;
-  const imgW = img.naturalWidth || img.width;
-  const imgH = img.naturalHeight || img.height;
+  const imgW = processedImg.naturalWidth || processedImg.width;
+  const imgH = processedImg.naturalHeight || processedImg.height;
 
   if (!imgW || !imgH) {
     throw new Error(`Image has no dimensions. It may not be fully loaded.`);
@@ -542,7 +563,7 @@ export function processSpriteSheet(img, frameCount, options = {}) {
   const frameW = Math.floor(imgW / frameCount);
   const tmpCanvas = new OffscreenCanvas(imgW, imgH);
   const tmpCtx = tmpCanvas.getContext('2d');
-  tmpCtx.drawImage(img, 0, 0);
+  tmpCtx.drawImage(processedImg, 0, 0);
 
   // Extract palette from first frame for shared palette mode
   let sharedPaletteOklab = null;

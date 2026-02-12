@@ -38,7 +38,7 @@ import {
 } from '@chakra-ui/react'
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
 import { generateImage, generateSpriteSheet, DEFAULT_NEGATIVE_PROMPT, lastRequest } from './image-service.js'
-import { processImage, processSpriteSheet, renderPixelArt, DITHER_OPTIONS } from './pixel-processor.js'
+import { processImage, processSpriteSheet, renderPixelArt, DITHER_OPTIONS, PREPROCESSING_PRESETS } from './pixel-processor.js'
 import { CONSOLES, DEFAULT_CONSOLE } from './palettes.js'
 import { fetchImageModels, initModels, DEFAULT_MODELS, DEFAULT_MODEL_ID } from './model-service.js'
 import {
@@ -72,6 +72,7 @@ function App() {
   const [cleanup, setCleanup] = useState(true)
   const [negativePrompt, setNegativePrompt] = useState('')
   const [seed, setSeed] = useState('')
+  const [preprocessingMode, setPreprocessingMode] = useState('standard')
   
   // Animation state
   const [animState, setAnimState] = useState(DEFAULT_STATE)
@@ -230,13 +231,16 @@ function App() {
       
       await new Promise(r => setTimeout(r, 50))
       
-      const { pixelData, spriteW, spriteH } = processImage(img, {
+      const preprocessingOptions = PREPROCESSING_PRESETS[preprocessingMode] || PREPROCESSING_PRESETS.none
+      
+      const { pixelData, spriteW, spriteH } = await processImage(img, {
         consoleId,
         spriteSize,
         dithering,
         pipeline: pipelineMode,
         outlines,
         cleanup,
+        preprocessing: preprocessingOptions,
       })
       
       if (pixelCanvasRef.current) {
@@ -271,26 +275,33 @@ function App() {
     } finally {
       setIsGenerating(false)
     }
-  }, [prompt, consoleId, ditherMode, modelId, negativePrompt, seed, animState, view, currentFrame, transparentBg, spriteSize, pipelineMode, outlines, cleanup, showGrid, toast, getFrameCount, getCurrentFrames, syncPlayerFrames])
+  }, [prompt, consoleId, ditherMode, modelId, negativePrompt, seed, animState, view, currentFrame, transparentBg, spriteSize, pipelineMode, outlines, cleanup, showGrid, preprocessingMode, toast, getFrameCount, getCurrentFrames, syncPlayerFrames])
   
   // Handle reprocess
-  const handleReprocess = useCallback(() => {
+  const handleReprocess = useCallback(async () => {
     if (!sourceImageSrc) return
     
     const consoleCfg = CONSOLES[consoleId]
     const dithering = ditherMode || null
+    const preprocessingOptions = PREPROCESSING_PRESETS[preprocessingMode] || PREPROCESSING_PRESETS.none
     
     try {
       const img = new Image()
       img.src = sourceImageSrc
       
-      const { pixelData, spriteW, spriteH } = processImage(img, {
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+      })
+      
+      const { pixelData, spriteW, spriteH } = await processImage(img, {
         consoleId,
         spriteSize,
         dithering,
         pipeline: pipelineMode,
         outlines,
         cleanup,
+        preprocessing: preprocessingOptions,
       })
       
       if (pixelCanvasRef.current) {
@@ -314,14 +325,14 @@ function App() {
         duration: 3000,
       })
     }
-  }, [sourceImageSrc, consoleId, spriteSize, ditherMode, pipelineMode, outlines, cleanup, showGrid, toast])
+  }, [sourceImageSrc, consoleId, spriteSize, ditherMode, pipelineMode, outlines, cleanup, showGrid, preprocessingMode, toast])
   
   // Auto-reprocess when settings change
   useEffect(() => {
     if (sourceImageSrc) {
       handleReprocess()
     }
-  }, [consoleId, spriteSize, ditherMode, showGrid, pipelineMode, outlines, cleanup, sourceImageSrc, handleReprocess])
+  }, [consoleId, spriteSize, ditherMode, showGrid, pipelineMode, outlines, cleanup, preprocessingMode, sourceImageSrc, handleReprocess])
   
   // Handle generate all frames
   const handleGenerateAllFrames = async () => {
@@ -414,13 +425,16 @@ function App() {
       
       await new Promise(r => setTimeout(r, 50))
       
-      const { frames: processedFrames } = processSpriteSheet(sheetImg, total, {
+      const preprocessingOptions = PREPROCESSING_PRESETS[preprocessingMode] || PREPROCESSING_PRESETS.none
+      
+      const { frames: processedFrames } = await processSpriteSheet(sheetImg, total, {
         consoleId,
         spriteSize,
         dithering,
         pipeline: pipelineMode,
         outlines,
         cleanup,
+        preprocessing: preprocessingOptions,
       })
       
       const storedFrames = getCurrentFrames()
@@ -771,6 +785,21 @@ function App() {
             >
               {ditherOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </Select>
+          </FormControl>
+          
+          <FormControl maxW="180px">
+            <FormLabel fontSize="xs" color="gray.400">Preprocessing:</FormLabel>
+            <Select
+              value={preprocessingMode}
+              onChange={(e) => setPreprocessingMode(e.target.value)}
+              bg="background.secondary"
+              borderColor="gray.600"
+              size="sm"
+            >
+              {Object.entries(PREPROCESSING_PRESETS).map(([key, preset]) => (
+                <option key={key} value={key}>{preset.label}</option>
               ))}
             </Select>
           </FormControl>
