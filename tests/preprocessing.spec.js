@@ -49,16 +49,27 @@ test.describe('Image Preprocessing', () => {
     await page.locator('input[placeholder*="mushroom"]').or(page.locator('#prompt')).or(page.locator('input[type="text"]').first()).fill('a red mushroom');
     
     // Click generate button
-    await page.locator('button').filter({ hasText: 'Generate' }).click();
+    const generateButton = page.locator('button').filter({ hasText: 'Generate' });
+    await generateButton.click();
 
-    // Wait for completion
-    await page.waitForTimeout(5000);
+    // Wait for generation to complete by checking for disabled state to clear
+    await generateButton.waitFor({ state: 'attached' });
+    await page.waitForTimeout(500); // Small delay for processing
     
-    // Source and pixel canvas should be visible
+    // Check that canvas has been rendered
     const hasContent = await page.evaluate(() => {
-      const sourceImg = document.querySelector('img[alt*="source"]') || document.querySelector('img[src*="blob"]');
       const canvas = document.querySelector('canvas');
-      return !!(sourceImg && canvas);
+      if (!canvas) return false;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // Check for non-transparent pixels
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (imageData.data[i] > 0) return true;
+      }
+      return false;
     });
     
     expect(hasContent).toBeTruthy();

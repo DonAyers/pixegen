@@ -246,9 +246,9 @@ function stabilizeColors(imageData) {
   const totalPixels = width * height;
   
   // Normalize CDF to 0-255 range
-  const minR = cdfR.find(v => v > 0) || 0;
-  const minG = cdfG.find(v => v > 0) || 0;
-  const minB = cdfB.find(v => v > 0) || 0;
+  const minR = cdfR.findIndex(v => v > 0);
+  const minG = cdfG.findIndex(v => v > 0);
+  const minB = cdfB.findIndex(v => v > 0);
   
   for (let i = 0; i < data.length; i += 4) {
     if (data[i + 3] > 10) {
