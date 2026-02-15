@@ -12,6 +12,7 @@ A tool to generate pixel art assets using AI image generation models.
 - 🔍 Inspector view to debug model inputs and outputs
 - 💾 Save and load sprite sheets
 - 🎯 Advanced color processing with OKLAB color space
+- ✨ **NEW**: Image preprocessing for improved sprite quality (noise reduction, edge enhancement, contrast/saturation boost)
 
 ## Setup
 
@@ -77,6 +78,13 @@ npm run preview
 - `index.html` - Main HTML file
 - `src/main.js` - Application logic
 - `src/style.css` - Styling
+- `src/image-preprocessor.js` - Image preprocessing pipeline
+- `src/pixel-processor.js` - Pixel art conversion pipeline
 - `tests/` - Playwright test files
+- `docs/PREPROCESSING.md` - Image preprocessing guide
 - `vite.config.js` - Vite configuration
 - `playwright.config.js` - Playwright configuration
+
+## Documentation
+
+- [Image Preprocessing Guide](docs/PREPROCESSING.md) - Learn about preprocessing options and best practices
