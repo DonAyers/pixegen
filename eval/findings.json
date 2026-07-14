@@ -1,0 +1,282 @@
+{
+  "version": 1,
+  "ideal": {
+    "nes": {
+      "settings": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "none"
+      },
+      "trials": 5,
+      "updatedAt": "2026-07-14T17:21:50.866Z",
+      "lastTrialId": "tmrkx3v0prq"
+    },
+    "gameboy": {
+      "settings": {
+        "model": "flux",
+        "spriteSize": "16x16",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "standard"
+      },
+      "trials": 1,
+      "updatedAt": "2026-07-14T02:47:45.889Z",
+      "lastTrialId": "tmrk1uilqtc"
+    }
+  },
+  "trials": [
+    {
+      "id": "tmrk1exu2wu",
+      "date": "2026-07-14T02:33:53.354Z",
+      "target": "nes",
+      "prompt": "a heroic knight with a sword and shield",
+      "seed": 31337,
+      "model": "flux",
+      "a": {
+        "model": "flux",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "standard"
+      },
+      "b": {
+        "model": "flux",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": "bayer",
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "standard"
+      },
+      "winner": "a",
+      "notes": "bayer dithers the flat background into checkerboard noise and makes the sprite harder to read; undithered is cleaner. Both weak overall: the flux source is a good sprite but occupies ~40% of canvas, so 32x32 downscale starves it — auto-crop-to-subject before downscale is the real fix (next axis to test).",
+      "source": "cli",
+      "judgedAt": "2026-07-14T02:36:57.458Z"
+    },
+    {
+      "id": "tmrk1jrowvv",
+      "date": "2026-07-14T02:37:38.672Z",
+      "target": "nes",
+      "prompt": "a heroic knight with a sword and shield",
+      "seed": 31337,
+      "model": "zimage",
+      "a": {
+        "model": "flux",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "standard"
+      },
+      "b": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "standard"
+      },
+      "winner": "b",
+      "notes": "zimage's source fills the frame (~70% subject coverage) vs flux's ~40%, so the 32x32 downscale keeps a fully readable knight (helmet/sword/shield legible, good silhouette). flux side is an unreadable blob at this scale. Residual: background speckle from zimage source noise survives cleanup — auto-crop and background handling are the next axes.",
+      "source": "cli",
+      "judgedAt": "2026-07-14T02:38:40.575Z"
+    },
+    {
+      "id": "tmrk1lchgfn",
+      "date": "2026-07-14T02:38:52.276Z",
+      "target": "nes",
+      "prompt": "a heroic knight with a sword and shield",
+      "seed": 31337,
+      "model": "zimage",
+      "a": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "standard"
+      },
+      "b": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "none"
+      },
+      "winner": "b",
+      "notes": "With a clean modern source (zimage), 'standard' preprocessing amplifies fine noise into background speckles that survive quantization; the raw source quantizes much cleaner (near-uniform background, same silhouette readability). Direct confirmation of Next-Phase §2's over-processing hypothesis: good models need less correction.",
+      "source": "cli",
+      "judgedAt": "2026-07-14T02:39:33.741Z"
+    },
+    {
+      "id": "tmrk1me8txd",
+      "date": "2026-07-14T02:39:41.213Z",
+      "target": "nes",
+      "prompt": "a heroic knight with a sword and shield",
+      "seed": 31337,
+      "model": "zimage",
+      "a": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "none"
+      },
+      "b": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": false,
+        "cleanup": true,
+        "preprocessing": "none"
+      },
+      "winner": "tie",
+      "notes": "Near-identical: modern pixel-art-styled sources (zimage) already draw their own dark outlines, so the auto-outline pass is a visual no-op; keep it on as a harmless default for sources that lack outlines.",
+      "source": "cli",
+      "judgedAt": "2026-07-14T02:40:42.389Z"
+    },
+    {
+      "id": "tmrk1qoxs83",
+      "date": "2026-07-14T02:43:01.696Z",
+      "target": "nes",
+      "prompt": "a heroic knight with a sword and shield",
+      "seed": 31337,
+      "model": "zimage",
+      "a": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "none"
+      },
+      "b": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "none"
+      },
+      "winner": "tie",
+      "notes": "No-op: zimage's scattered background speckles count as subject pixels, inflating the naive bbox to the full frame so autoCrop bails. Needs a noise-robust bbox (percentile-of-subject-mass trim) — retest after. On clean-background sources (flux) offline reprocessing shows autoCrop is a dramatic win.",
+      "source": "cli",
+      "judgedAt": "2026-07-14T02:44:02.343Z"
+    },
+    {
+      "id": "tmrk1t607bx",
+      "date": "2026-07-14T02:44:57.127Z",
+      "target": "nes",
+      "prompt": "a heroic knight with a sword and shield",
+      "seed": 31337,
+      "model": "zimage",
+      "a": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "none"
+      },
+      "b": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "none"
+      },
+      "winner": "b",
+      "notes": "Percentile-mass bbox fixed the speckle no-op: autoCrop now crops through the noise and the knight fills the 32x32 frame — shield emblem legible, clean silhouette, background speckles cropped away. Biggest single quality lever found so far; strong candidate for recipe default on single sprites.",
+      "source": "cli",
+      "judgedAt": "2026-07-14T02:45:49.897Z"
+    },
+    {
+      "id": "tmrk1uilqtc",
+      "date": "2026-07-14T02:46:00.110Z",
+      "target": "gameboy",
+      "prompt": "a small round robot companion",
+      "seed": 4242,
+      "model": "flux",
+      "a": {
+        "model": "flux",
+        "spriteSize": "16x16",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "preprocessing": "standard"
+      },
+      "b": {
+        "model": "flux",
+        "spriteSize": "16x16",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "standard"
+      },
+      "winner": "b",
+      "notes": "At 16x16 the crop is existential: without it the small-in-frame flux subject downscales to two unreadable smudges; with autoCrop the robot has a readable silhouette, limbs, and shading. autoCrop matters more the smaller the target scale.",
+      "source": "cli",
+      "judgedAt": "2026-07-14T02:47:45.889Z"
+    },
+    {
+      "id": "tmrkx3v0prq",
+      "date": "2026-07-14T17:21:04.201Z",
+      "target": "nes",
+      "prompt": "a heroic knight with a sword and shield",
+      "seed": 31337,
+      "model": "zimage",
+      "a": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "none"
+      },
+      "b": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": false,
+        "autoCrop": true,
+        "preprocessing": "none"
+      },
+      "winner": "a",
+      "notes": "Without the orphan-cleanup pass, stray single blue/orange pixels survive around the sprite (helmet, sword base, right edge); with cleanup the same frame is speckle-free and otherwise identical. Cleanup stays on.",
+      "source": "cli",
+      "judgedAt": "2026-07-14T17:21:50.866Z"
+    }
+  ]
+}

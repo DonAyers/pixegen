@@ -3,7 +3,18 @@
  *
  * Assembles generated animation frames into a horizontal sprite sheet PNG.
  * Also exports a JSON atlas for use in Phaser.js or other game frameworks.
+ * The atlas format itself is built in src/core/atlas.js, shared with the
+ * Node CLI/MCP export path.
  */
+
+import { buildJsonAtlas } from "./core/atlas.js";
+import {
+    buildSheetModel,
+    emitSheetMetadata,
+    EXPORT_FORMATS,
+} from "./core/exporters.js";
+
+export { buildJsonAtlas, buildSheetModel, emitSheetMetadata, EXPORT_FORMATS };
 
 /**
  * Build a horizontal sprite sheet from an array of frame canvases.
@@ -49,67 +60,44 @@ export function buildSpriteSheet(frames, options = {}) {
 }
 
 /**
- * Generate a Phaser.js-compatible JSON Atlas for the sprite sheet.
+ * Build a packed multi-animation sprite sheet (one row per animation) from
+ * hydrated frame canvases, using the shared sheet model for layout.
  *
- * @param {object} sheetInfo - From buildSpriteSheet
- * @param {object} meta
- * @param {string} meta.imageName - Filename for the sprite sheet image
- * @param {string} meta.animName - Animation key name
- * @param {number} meta.frameCount - Number of frames
- * @param {number} meta.fps - Playback FPS
- * @param {boolean} meta.loop - Whether animation loops
- * @param {number} meta.padding - Padding between frames
- * @returns {object} JSON Atlas object
+ * @param {Array<{ name: string, fps?: number, loop?: boolean, frames: Array<{ canvas, pixelData?, spriteW, spriteH }> }>} animations
+ * @param {object} options
+ * @param {string} [options.imageName]
+ * @param {number} [options.padding=0]
+ * @returns {{ canvas: HTMLCanvasElement, model: object }}
  */
-export function buildJsonAtlas(sheetInfo, meta = {}) {
-  const {
-    imageName = 'spritesheet.png',
-    animName = 'animation',
-    frameCount = 1,
-    fps = 8,
-    loop = true,
-    padding = 0,
-  } = meta;
+export function buildPackedSheet(animations, options = {}) {
+  const model = buildSheetModel(
+    animations.map((a) => ({
+      name: a.name,
+      fps: a.fps,
+      loop: a.loop,
+      frames: a.frames.map((f) => ({ width: f.spriteW, height: f.spriteH })),
+    })),
+    options,
+  );
 
-  const { frameWidth, frameHeight, width, height } = sheetInfo;
+  const canvas = document.createElement('canvas');
+  canvas.width = model.width;
+  canvas.height = model.height;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
 
-  // Phaser JSON Array format
-  const frames = [];
-  for (let i = 0; i < frameCount; i++) {
-    frames.push({
-      filename: `${animName}_${String(i).padStart(3, '0')}`,
-      frame: {
-        x: i * (frameWidth + padding),
-        y: 0,
-        w: frameWidth,
-        h: frameHeight,
-      },
-      rotated: false,
-      trimmed: false,
-      spriteSourceSize: { x: 0, y: 0, w: frameWidth, h: frameHeight },
-      sourceSize: { w: frameWidth, h: frameHeight },
-    });
+  for (const placed of model.frames) {
+    const anim = animations.find((a) => a.name === placed.animation);
+    const frame = anim?.frames[placed.index];
+    if (!frame) continue;
+    if (frame.pixelData) {
+      ctx.putImageData(frame.pixelData, placed.x, placed.y);
+    } else {
+      ctx.drawImage(frame.canvas, placed.x, placed.y, placed.w, placed.h);
+    }
   }
 
-  return {
-    frames,
-    meta: {
-      app: 'PixelGen',
-      version: '1.0',
-      image: imageName,
-      format: 'RGBA8888',
-      size: { w: width, h: height },
-      scale: 1,
-    },
-    animations: [
-      {
-        key: animName,
-        frameRate: fps,
-        repeat: loop ? -1 : 0,
-        frames: frames.map(f => f.filename),
-      },
-    ],
-  };
+  return { canvas, model };
 }
 
 /**

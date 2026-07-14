@@ -1,49 +1,45 @@
 /**
- * Multi-Provider Service
- * 
- * Manages multiple image generation API providers (Pollinations, Gemini, etc.)
- * Discovers available providers based on environment variables and provides
- * a unified interface for model selection and image generation.
+ * Multi-Provider Service — browser adapter.
+ *
+ * Pollinations is the zero-config default backend (GET API through the
+ * Vite proxy, key injected server-side). The OpenAI BYOK lane (added
+ * 2026-07-14, consistent with docs/PROVIDERS.md §2's revision) goes
+ * through a dev-server POST endpoint (/api/openai/generate) that calls
+ * the OpenAI Images API with the server-side OPENAI_API_KEY — the
+ * original guardrail holds: no provider appears selectable without a
+ * key-safe server-side route, and unavailable providers' models render
+ * disabled (with the reason) rather than silently failing.
+ *
+ * The model lists (with paidOnly / supportsTransparent / supportsSeed
+ * capability flags) live in src/core/models.js, shared with CLI/MCP.
  */
+
+import {
+    POLLINATIONS_MODELS,
+    OPENAI_MODELS,
+    parseModelId,
+    modelSupportsTransparent,
+    modelIsPaidOnly,
+} from "./core/models.js";
+
+export { parseModelId, modelSupportsTransparent, modelIsPaidOnly };
 
 /**
  * Provider configuration for supported API services.
- * Each provider defines its available models and how to route requests.
  */
 const PROVIDER_CONFIGS = {
-  pollinations: {
-    name: 'Pollinations',
-    envKey: 'POLLINATIONS_API_KEY',
-    apiBase: '/api/pollinations',
-    models: [
-      { id: 'flux', name: 'Flux Schnell', description: 'Fast high-quality generation', cost: 'Free-tier' },
-      { id: 'zimage', name: 'Z-Image Turbo', description: 'Fast Flux + 2x upscaling', cost: 'Free-tier' },
-      { id: 'gptimage', name: 'GPT Image 1 Mini', description: 'OpenAI — excellent prompt following', cost: '~$0.008/img' },
-      { id: 'nanobanana', name: 'Gemini Flash Image', description: 'Google Gemini 2.5 Flash', cost: '~$0.039/img' },
-      { id: 'nanobanana-pro', name: 'Gemini 3 Pro Image', description: 'Highest quality, 4K support', cost: '~$0.134/img' },
-      { id: 'seedream', name: 'Seedream 4.0', description: 'ByteDance — good quality', cost: '~$0.03/img' },
-      { id: 'klein', name: 'FLUX.2 Klein 4B', description: 'Fast generation & editing', cost: '~$0.008/img' },
-      { id: 'kontext', name: 'FLUX.1 Kontext', description: 'In-context image editing', cost: '~$0.04/img' },
-    ],
-  },
-  gemini: {
-    name: 'Google Gemini',
-    envKey: 'GEMINI_API_KEY',
-    apiBase: '/api/gemini',
-    models: [
-      { id: 'gemini-flash-image', name: 'Gemini 2.5 Flash', description: 'Fast image generation', cost: '~$0.039/img' },
-      { id: 'gemini-pro-image', name: 'Gemini 3 Pro', description: 'High quality image generation', cost: '~$0.134/img' },
-    ],
-  },
-  openai: {
-    name: 'OpenAI',
-    envKey: 'OPENAI_API_KEY',
-    apiBase: '/api/openai',
-    models: [
-      { id: 'dall-e-3', name: 'DALL-E 3', description: 'High quality image generation', cost: '~$0.04/img' },
-      { id: 'dall-e-2', name: 'DALL-E 2', description: 'Fast image generation', cost: '~$0.02/img' },
-    ],
-  },
+    pollinations: {
+        name: "Pollinations",
+        envKey: "POLLINATIONS_API_KEY",
+        apiBase: "/api/pollinations",
+        models: POLLINATIONS_MODELS,
+    },
+    openai: {
+        name: "OpenAI (BYOK)",
+        envKey: "OPENAI_API_KEY",
+        apiBase: "/api/openai",
+        models: OPENAI_MODELS,
+    },
 };
 
 /**
@@ -57,75 +53,61 @@ let availableProviders = [];
  * The Vite config injects this data during build.
  */
 export function initializeProviders(providerList) {
-  availableProviders = providerList || ['pollinations'];
+    availableProviders = providerList || ["pollinations"];
 }
 
 /**
  * Get list of all available providers.
  */
 export function getAvailableProviders() {
-  return availableProviders;
+    return availableProviders;
 }
 
 /**
- * Get all models from all available providers.
- * Returns a flat list with provider information embedded.
- * 
- * @returns {Array<{id: string, name: string, description: string, cost: string, provider: string, providerName: string}>}
+ * Get all models from all known providers, flagged with availability.
+ * Unavailable providers' models are included so pickers can render them
+ * disabled with the reason (discoverability beats hiding), but they are
+ * never selectable.
+ *
+ * @returns {Array<{id: string, name: string, description: string, cost: string, paidOnly: boolean, supportsTransparent: boolean, supportsSeed: boolean, provider: string, providerName: string, fullId: string, available: boolean}>}
  */
 export function getAllModels() {
-  const models = [];
-  
-  for (const providerId of availableProviders) {
-    const config = PROVIDER_CONFIGS[providerId];
-    if (!config) continue;
-    
-    for (const model of config.models) {
-      models.push({
-        ...model,
-        provider: providerId,
-        providerName: config.name,
-        // Prefix model ID with provider for uniqueness
-        fullId: `${providerId}:${model.id}`,
-      });
-    }
-  }
-  
-  return models;
-}
+    const models = [];
 
-/**
- * Parse a full model ID into provider and model parts.
- * 
- * @param {string} fullId - Format: "provider:modelId"
- * @returns {{provider: string, modelId: string}}
- */
-export function parseModelId(fullId) {
-  const parts = fullId.split(':');
-  if (parts.length === 2) {
-    return { provider: parts[0], modelId: parts[1] };
-  }
-  // Fallback to pollinations for backward compatibility
-  return { provider: 'pollinations', modelId: fullId };
+    for (const [providerId, config] of Object.entries(PROVIDER_CONFIGS)) {
+        const available = availableProviders.includes(providerId);
+        for (const model of config.models) {
+            models.push({
+                ...model,
+                provider: providerId,
+                providerName: config.name,
+                // Prefix model ID with provider for uniqueness
+                fullId: `${providerId}:${model.id}`,
+                available,
+            });
+        }
+    }
+
+    return models;
 }
 
 /**
  * Get the API base URL for a given provider.
- * 
+ *
  * @param {string} providerId
  * @returns {string}
  */
 export function getProviderApiBase(providerId) {
-  const config = PROVIDER_CONFIGS[providerId];
-  return config ? config.apiBase : '/api/pollinations';
+    const config = PROVIDER_CONFIGS[providerId];
+    return config ? config.apiBase : "/api/pollinations";
 }
 
 /**
  * Get the default model ID (first available model).
- * 
+ *
  * @returns {string}
  */
 export function getDefaultModelId() {
-  const models = getAllModels();
-  return models.length > 0 ? models[0].fullId : 'pollinations:flux';
+    const available = getAllModels().filter((m) => m.available);
+    return available.length > 0 ? available[0].fullId : "pollinations:flux";
 }

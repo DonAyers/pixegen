@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "bin": {
+    "pixegen": "bin/pixegen.js",
+    "pixegen-mcp": "bin/pixegen-mcp.js"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -21,10 +25,14 @@
     "@chakra-ui/react": "^2.10.9",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dexie": "^4.3.0",
     "framer-motion": "^12.34.0",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "rgbquant": "^1.1.2"
+    "rgbquant": "^1.1.2",
+    "zod": "^4.4.3"
   }
 }

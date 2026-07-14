@@ -16,7 +16,7 @@ export const VIEWS = {
   'side': {
     id: 'side',
     name: 'Side',
-    promptDesc: 'side view, profile view, facing right',
+    promptDesc: 'side view, facing right',
     shortDesc: 'profile',
   },
   'front': {
@@ -46,7 +46,7 @@ export const VIEWS = {
   'top-down': {
     id: 'top-down',
     name: 'Top-Down',
-    promptDesc: 'top-down view, seen from above, bird-eye view',
+    promptDesc: 'top-down view, seen directly from above',
     shortDesc: 'top-down',
   },
 };

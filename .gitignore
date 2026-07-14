@@ -6,3 +6,5 @@ dist
 .env.local
 playwright-report
 test-results
+eval-out
+logs

@@ -120,6 +120,17 @@ export class AnimationPlayer {
   }
 
   /**
+   * Jump directly to a frame (pauses playback).
+   * @param {number} idx - Frame index
+   */
+  seek(idx) {
+    if (idx < 0 || idx >= this.frames.length) return;
+    this.pause();
+    this._currentFrame = idx;
+    this._drawFrame(idx);
+  }
+
+  /**
    * Step backward one frame.
    */
   stepBackward() {

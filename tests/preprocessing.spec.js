@@ -9,7 +9,7 @@ test.describe('Image Preprocessing', () => {
     
     // Check preprocessing dropdown exists
     const preprocessingSelect = page.locator('select').filter({ hasText: /Preprocessing/ }).first();
-    await expect(preprocessingSelect.or(page.locator('text=Preprocessing').locator('..'))).toBeAttached();
+    await expect(preprocessingSelect.or(page.locator('text=Preprocessing').locator('..')).first()).toBeAttached();
   });
 
   test('should have preprocessing preset options', async ({ page }) => {
@@ -34,7 +34,14 @@ test.describe('Image Preprocessing', () => {
       return Buffer.from(TEST_PNG_BASE64, 'base64');
     }
 
-    // Mock the API
+    // Mock the API (current endpoint + legacy /api/generate path)
+    await page.route('**/api/pollinations/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: getTestPngBuffer(),
+      });
+    });
     await page.route('**/api/generate/**', async (route) => {
       await route.fulfill({
         status: 200,
@@ -46,15 +53,17 @@ test.describe('Image Preprocessing', () => {
     await page.goto('/');
     
     // Fill in prompt and generate
-    await page.locator('input[placeholder*="mushroom"]').or(page.locator('#prompt')).or(page.locator('input[type="text"]').first()).fill('a red mushroom');
+    await page
+      .getByPlaceholder('e.g. a knight with a sword')
+      .fill('a red mushroom');
     
-    // Click generate button
-    const generateButton = page.locator('button').filter({ hasText: 'Generate' });
+    // Click generate button (exact match — "Generate All Frames" and
+    // "Generate Tileset" buttons elsewhere in the app also contain "Generate").
+    const generateButton = page.getByRole('button', { name: 'Generate', exact: true });
     await generateButton.click();
 
-    // Wait for generation to complete by checking for disabled state to clear
-    await generateButton.waitFor({ state: 'attached' });
-    await page.waitForTimeout(500); // Small delay for processing
+    // Wait for generation + processing to complete (success toast)
+    await expect(page.getByText(/Done!/)).toBeVisible({ timeout: 15000 });
     
     // Check that canvas has been rendered
     const hasContent = await page.evaluate(() => {
