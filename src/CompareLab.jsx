@@ -46,6 +46,7 @@ import {
     processSpriteSheet,
     renderPixelArt,
     DITHER_OPTIONS,
+    DOWNSCALE_OPTIONS,
     PREPROCESSING_PRESETS,
 } from "./pixel-processor.js";
 import {
@@ -72,6 +73,7 @@ function configToSettings(config) {
         model: config.modelId.split(":").pop(),
         spriteSize: config.spriteSize,
         pipeline: config.pipeline,
+        downscale: config.downscale || null,
         dithering: config.dither || null,
         outlines: config.outlines,
         cleanup: config.cleanup,
@@ -86,6 +88,7 @@ function defaultSideConfig(modelId) {
         consoleId: "nes",
         spriteSize: "32x32",
         pipeline: "enhanced",
+        downscale: "",
         dither: "",
         preprocess: "standard",
         outlines: true,
@@ -104,6 +107,7 @@ function configFromRecipe(recipeId, current) {
         consoleId: recipe.consoleId,
         spriteSize: recipe.spriteSize,
         pipeline: recipe.pipeline,
+        downscale: recipe.downscale || "",
         dither: recipe.dithering || "",
         preprocess:
             typeof recipe.preprocessing === "string"
@@ -269,6 +273,29 @@ function SidePanel({ label, config, setConfig, models, disabled }) {
                         borderColor="gray.600"
                     >
                         {ditherOptions.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                    </Select>
+                </FormControl>
+            </HStack>
+
+            <HStack spacing={3}>
+                <FormControl>
+                    <FormLabel fontSize="xs" color="gray.400">
+                        Downscale:
+                    </FormLabel>
+                    <Select
+                        size="sm"
+                        value={config.downscale}
+                        isDisabled={disabled}
+                        onChange={(e) => set({ downscale: e.target.value })}
+                        bg="background.tertiary"
+                        borderColor="gray.600"
+                    >
+                        <option value="">Auto (pipeline default)</option>
+                        {DOWNSCALE_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                                 {opt.label}
                             </option>
@@ -493,6 +520,7 @@ export function CompareLab({ toast, onRecordPrompt }) {
                 spriteSize: config.spriteSize,
                 dithering: config.dither || null,
                 pipeline: config.pipeline,
+                downscale: config.downscale || undefined,
                 outlines: config.outlines,
                 cleanup: config.cleanup,
                 preprocessing:

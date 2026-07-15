@@ -92,6 +92,12 @@ const commonGenerationSchema = {
         .describe(
             'Sprite footprint override, "WxH" (preset like 32x32 or custom like 24x21).',
         ),
+    downscale: z
+        .enum(["mode", "average", "k-centroid"])
+        .optional()
+        .describe(
+            "Downscale strategy override. mode = edge-preserving (default for the enhanced pipeline), average = smooth/legacy, k-centroid = noise-robust k-means downscale (best on noisy AI output).",
+        ),
     seed: z
         .number()
         .int()
@@ -148,6 +154,7 @@ function toGenerationOptions(args, runLog) {
         model: args.model,
         consoleId: args.palette,
         spriteSize: args.size,
+        downscale: args.downscale,
         quality: args.quality,
         seed: args.seed,
         transparent: args.transparent !== false,

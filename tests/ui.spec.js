@@ -42,9 +42,10 @@ test.describe("PixelGen UI", () => {
         await expect(page.locator("select").nth(2)).toBeVisible(); // model
         await expect(page.locator("select").nth(3)).toBeVisible(); // pipeline
         await expect(page.locator("select").nth(4)).toBeVisible(); // dither
-        await expect(page.locator("select").nth(5)).toBeVisible(); // preprocessing
-        await expect(page.locator("select").nth(6)).toBeVisible(); // animation
-        await expect(page.locator("select").nth(7)).toBeVisible(); // view
+        await expect(page.locator("select").nth(5)).toBeVisible(); // downscale
+        await expect(page.locator("select").nth(6)).toBeVisible(); // preprocessing
+        await expect(page.locator("select").nth(7)).toBeVisible(); // animation
+        await expect(page.locator("select").nth(8)).toBeVisible(); // view
         await expect(
             page.getByRole("tab", { name: /generator/i }),
         ).toBeVisible();
@@ -214,13 +215,13 @@ test.describe("PixelGen UI", () => {
         await expect(negInput).toHaveValue("blurry, realistic");
 
         // Animation state selector defaults to idle
-        const animSelect = page.locator("select").nth(6);
+        const animSelect = page.locator("select").nth(7);
         await expect(animSelect).toHaveValue("idle");
         await animSelect.selectOption("walk");
         await expect(animSelect).toHaveValue("walk");
 
         // View selector defaults to side
-        const viewSelect = page.locator("select").nth(7);
+        const viewSelect = page.locator("select").nth(8);
         await expect(viewSelect).toHaveValue("side");
         await viewSelect.selectOption("front");
         await expect(viewSelect).toHaveValue("front");
@@ -249,7 +250,7 @@ test.describe("PixelGen UI", () => {
         await expect(page.getByText("1 / 2")).toBeVisible();
 
         // Switch to walk = 4 frames
-        const animSelect = page.locator("select").nth(6);
+        const animSelect = page.locator("select").nth(7);
         await animSelect.selectOption("walk");
         await expect(page.getByText("1 / 4")).toBeVisible();
 

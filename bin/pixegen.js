@@ -107,6 +107,8 @@ Common options:
   -p, --palette <id>       Palette profile override (see 'pixegen palettes')
   -s, --size <WxH>         Sprite scale override, preset or custom (e.g. 32x32)
       --dither <mode>      '' or 'bayer' (enhanced pipeline)
+      --downscale <mode>   mode | average | k-centroid (overrides the
+                           pipeline's default downscale strategy)
       --preprocess <name>  ${Object.keys(PREPROCESSING_PRESETS).join(" | ")}
       --quality <tier>     low | medium | high | auto (passed to the provider)
       --seed <n>           Reproducible-ish seed (best-effort; OpenAI ignores it)
@@ -162,6 +164,7 @@ const COMMON_OPTIONS = {
     palette: { type: "string", short: "p" },
     size: { type: "string", short: "s" },
     dither: { type: "string" },
+    downscale: { type: "string" },
     preprocess: { type: "string" },
     quality: { type: "string" },
     seed: { type: "string" },
@@ -230,6 +233,7 @@ function generationOptions(values, runLog) {
         consoleId: values.palette,
         spriteSize: values.size,
         dithering: values.dither,
+        downscale: values.downscale,
         outlines: values["no-outlines"] ? false : undefined,
         cleanup: values["no-cleanup"] ? false : undefined,
         autoCrop: values["auto-crop"]
@@ -487,6 +491,7 @@ function settingsToGenerationOptions(settings, target) {
         consoleId: target,
         spriteSize: settings.spriteSize,
         dithering: settings.dithering === null ? "" : settings.dithering,
+        downscale: settings.downscale,
         outlines: settings.outlines,
         cleanup: settings.cleanup,
         autoCrop: settings.autoCrop,
