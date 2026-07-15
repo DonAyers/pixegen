@@ -19,6 +19,7 @@ import {
 import {
     downscaleMode,
     downscaleAverage,
+    downscaleKCentroid,
     quantizeOklab,
     quantizeOklabBayer,
     quantizeBitReduce,
@@ -34,6 +35,17 @@ import { cropRaster, autoCropSubject } from "./raster.js";
 export const PIPELINE_MODES = [
     { value: "enhanced", label: "Enhanced (OKLAB + edge-preserving)" },
     { value: "classic", label: "Classic (RgbQuant sRGB)" },
+];
+
+/**
+ * Downscale strategy options — independent of pipeline mode. 'mode' and
+ * 'average' are each pipeline's traditional default; 'k-centroid' is the
+ * opt-in noise-robust strategy (docs/RETRO-DIFFUSION.md).
+ */
+export const DOWNSCALE_OPTIONS = [
+    { value: "mode", label: "Mode (edge-preserving)" },
+    { value: "average", label: "Average (smooth)" },
+    { value: "k-centroid", label: "K-Centroid (noise-robust)" },
 ];
 
 /**
@@ -79,6 +91,9 @@ export function resolveProfileAndSize(profileId, spriteSize) {
  * @param {string} [options.spriteSize] - Scale key or "WxH"
  * @param {string|null} [options.dithering]
  * @param {string} [options.pipeline] - 'enhanced' | 'classic'
+ * @param {string} [options.downscale] - 'mode' | 'average' | 'k-centroid';
+ *   defaults to the pipeline's traditional strategy ('mode' for enhanced,
+ *   'average' for classic) when unset — set explicitly to override
  * @param {boolean} [options.outlines]
  * @param {boolean} [options.cleanup]
  * @param {boolean} [options.autoCrop] - Crop to the subject's bounding box
@@ -96,6 +111,7 @@ export function processSourceRaster(sourceRaster, options = {}) {
         spriteSize,
         dithering = null,
         pipeline = "enhanced",
+        downscale,
         outlines = true,
         cleanup = true,
         autoCrop = false,
@@ -116,11 +132,16 @@ export function processSourceRaster(sourceRaster, options = {}) {
         source = autoCropSubject(source, { targetAspect: spriteW / spriteH });
     }
 
-    // Step 1: Downscale
+    // Step 1: Downscale. An explicit `downscale` overrides the pipeline's
+    // traditional default, so existing recipes/callers that never set it
+    // produce byte-identical output.
+    const downscaleStrategy = downscale || (pipeline === "enhanced" ? "mode" : "average");
     const downscaled =
-        pipeline === "enhanced"
-            ? downscaleMode(source, spriteW, spriteH)
-            : downscaleAverage(source, spriteW, spriteH);
+        downscaleStrategy === "k-centroid"
+            ? downscaleKCentroid(source, spriteW, spriteH)
+            : downscaleStrategy === "average"
+              ? downscaleAverage(source, spriteW, spriteH)
+              : downscaleMode(source, spriteW, spriteH);
 
     // Step 2: Quantize to the palette profile
     let pixelData;

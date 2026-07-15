@@ -49,11 +49,12 @@ export const RECIPES = {
     "gameboy-tiny": {
         label: "Game Boy tiny",
         description:
-            "4-shade Game Boy green, 16×16 with subject auto-crop — minimal, instantly readable handheld sprites. At this scale the crop is what makes the sprite readable at all (eval verdict, 2026-07-13).",
+            "4-shade Game Boy green, 16×16 with subject auto-crop and K-Centroid downscale — minimal, instantly readable handheld sprites. At this scale the crop is what makes the sprite readable at all (eval verdict, 2026-07-13). K-Centroid downscale won 2 decisive trials over the default mode downscale (2026-07-15): mode collapses too many tiles to background at this aggressive a downscale factor, losing subject detail or (in one trial) nearly the whole silhouette; K-Centroid's per-tile clustering keeps minority-but-substantial subject-color clusters and uses more of the 4-shade palette instead.",
         provisional: true,
         consoleId: "gameboy",
         spriteSize: "16x16",
         pipeline: "enhanced",
+        downscale: "k-centroid",
         dithering: null,
         outlines: true,
         cleanup: true,

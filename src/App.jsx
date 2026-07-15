@@ -50,6 +50,7 @@ import {
     processSpriteSheet,
     renderPixelArt,
     DITHER_OPTIONS,
+    DOWNSCALE_OPTIONS,
     PREPROCESSING_PRESETS,
 } from "./pixel-processor.js";
 import {
@@ -143,6 +144,7 @@ function App() {
     const [spriteSize, setSpriteSize] = useState("");
     const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
     const [pipelineMode, setPipelineMode] = useState("enhanced");
+    const [downscaleMode, setDownscaleMode] = useState("");
     const [ditherMode, setDitherMode] = useState("");
     const [showGrid, setShowGrid] = useState(false);
     const [transparentBg, setTransparentBg] = useState(false);
@@ -312,6 +314,7 @@ function App() {
                         spriteSize,
                         dithering,
                         pipeline: pipelineMode,
+                        downscale: downscaleMode,
                         outlines,
                         cleanup,
                         preprocessing: preprocessingOptions,
@@ -406,6 +409,7 @@ function App() {
             transparentBg,
             spriteSize,
             pipelineMode,
+            downscaleMode,
             outlines,
             cleanup,
             showGrid,
@@ -442,6 +446,7 @@ function App() {
                 spriteSize,
                 dithering,
                 pipeline: pipelineMode,
+                downscale: downscaleMode,
                 outlines,
                 cleanup,
                 preprocessing: preprocessingOptions,
@@ -480,6 +485,7 @@ function App() {
         spriteSize,
         ditherMode,
         pipelineMode,
+        downscaleMode,
         outlines,
         cleanup,
         showGrid,
@@ -498,6 +504,7 @@ function App() {
         ditherMode,
         showGrid,
         pipelineMode,
+        downscaleMode,
         outlines,
         cleanup,
         preprocessingMode,
@@ -591,6 +598,7 @@ function App() {
                     spriteSize,
                     dithering,
                     pipeline: pipelineMode,
+                    downscale: downscaleMode,
                     outlines,
                     cleanup,
                     preprocessing: preprocessingOptions,
@@ -701,6 +709,7 @@ function App() {
 
         if (settings.spriteSize) setSpriteSize(settings.spriteSize);
         if (settings.pipeline) setPipelineMode(settings.pipeline);
+        setDownscaleMode(settings.downscale || "");
         setDitherMode(settings.dithering || "");
         if (settings.outlines !== undefined) setOutlines(settings.outlines);
         if (settings.cleanup !== undefined) setCleanup(settings.cleanup);
@@ -1217,6 +1226,33 @@ function App() {
                                         size="sm"
                                     >
                                         {ditherOptions.map((opt) => (
+                                            <option
+                                                key={opt.value}
+                                                value={opt.value}
+                                            >
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                <FormControl maxW="180px">
+                                    <FormLabel fontSize="xs" color="gray.400">
+                                        Downscale:
+                                    </FormLabel>
+                                    <Select
+                                        value={downscaleMode}
+                                        onChange={(e) =>
+                                            setDownscaleMode(e.target.value)
+                                        }
+                                        bg="background.secondary"
+                                        borderColor="gray.600"
+                                        size="sm"
+                                    >
+                                        <option value="">
+                                            Auto (pipeline default)
+                                        </option>
+                                        {DOWNSCALE_OPTIONS.map((opt) => (
                                             <option
                                                 key={opt.value}
                                                 value={opt.value}
@@ -2064,6 +2100,7 @@ function App() {
                                             console: consoleId,
                                             spriteSize,
                                             pipelineMode,
+                                            downscaleMode: downscaleMode || "auto",
                                             dithering: ditherMode || "none",
                                             outlines,
                                             cleanup,

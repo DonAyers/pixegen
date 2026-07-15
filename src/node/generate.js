@@ -29,6 +29,7 @@ import {
     resolveProfileAndSize,
 } from "../core/pipeline.js";
 import { validateFrame, validateFrameSet } from "../core/validate.js";
+import { detectPixelGrid } from "../core/gridsize.js";
 import {
     modelSupportsTransparent,
     resolveModel,
@@ -43,6 +44,37 @@ import { NULL_RUN_LOG, errorDetail } from "./run-log.js";
 /** Seed bump between validation-retry attempts. */
 const RETRY_SEED_OFFSET = 1000;
 
+/** Grid-size advisory thresholds (Phase 4, docs/plan-prompt.md). */
+const GRID_CONFIDENCE_THRESHOLD = 0.5;
+const GRID_MISMATCH_THRESHOLD = 0.25;
+
+/**
+ * Advisory-only signal: does the AI-generated source image's own visible
+ * pixel grid agree with the sprite size we asked it to draw at? A
+ * high-confidence mismatch means the model didn't draw on the requested
+ * grid. Logged for later analysis only — never fails validation or
+ * triggers the retry (see core/validate.js for why this lives here
+ * instead of the pass/fail gate).
+ */
+function logGridSizeAdvisory(runLog, sourceRaster, spriteW, spriteH, context) {
+    const detection = detectPixelGrid(sourceRaster);
+    if (detection.confidence < GRID_CONFIDENCE_THRESHOLD) return;
+
+    const wDiff = Math.abs(detection.nativeW - spriteW) / spriteW;
+    const hDiff = Math.abs(detection.nativeH - spriteH) / spriteH;
+    if (wDiff <= GRID_MISMATCH_THRESHOLD && hDiff <= GRID_MISMATCH_THRESHOLD) return;
+
+    runLog.event("validation", {
+        ...context,
+        warning: "grid-size-mismatch",
+        requestedW: spriteW,
+        requestedH: spriteH,
+        detectedNativeW: detection.nativeW,
+        detectedNativeH: detection.nativeH,
+        confidence: detection.confidence,
+    });
+}
+
 function resolveSettings(options) {
     const {
         recipe,
@@ -50,6 +82,7 @@ function resolveSettings(options) {
         consoleId,
         spriteSize,
         dithering,
+        downscale,
         outlines,
         cleanup,
         autoCrop,
@@ -62,6 +95,7 @@ function resolveSettings(options) {
         consoleId,
         spriteSize,
         dithering,
+        downscale,
         outlines,
         cleanup,
         autoCrop,
@@ -140,6 +174,7 @@ function pipelineOptions(settings, preprocessingOptions) {
         spriteSize: settings.spriteSize,
         dithering: settings.dithering,
         pipeline: settings.pipeline || "enhanced",
+        downscale: settings.downscale,
         outlines: settings.outlines,
         cleanup: settings.cleanup,
         autoCrop: settings.autoCrop,
@@ -223,6 +258,10 @@ export async function generateSprite(prompt, options = {}) {
             raster,
             pipelineOptions(settings, preprocessingOptions),
         );
+        logGridSizeAdvisory(runLog, raster, spriteW, spriteH, {
+            kind: "sprite",
+            attempt: attempt + 1,
+        });
 
         const { ok, issues } = validate
             ? validateFrame(pixelData, { profile, transparentRequested })

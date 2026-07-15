@@ -80,6 +80,10 @@ node bin/pixegen.js generate "a knight with a sword" --recipe nes-classic -o ./a
 node bin/pixegen.js sheet "a knight" --anim walk --view side -o ./assets/knight-walk/
 node bin/pixegen.js sheet "a knight" --anim walk --format aseprite,godot,love2d,unity -o ./assets/knight-walk/
 node bin/pixegen.js tileset "sunset desert ruins" --cols 4 --rows 4 -o ./assets/desert/
+node bin/pixegen.js fix ./upscaled-sprite.png -o ./fixed.png --colors auto
+                                 # offline: detect the native pixel grid of an
+                                 # upscaled/JPEG-softened image, downscale back
+                                 # to it, optionally fix colors — no network
 node bin/pixegen.js recipes     # list named palette+scale+pipeline bundles
 node bin/pixegen.js models      # list models (free vs. paid-key-required)
 node bin/pixegen.js eval status # ideal-settings knowledge base state
@@ -98,10 +102,10 @@ issues into a non-zero exit code.
 
 `bin/pixegen-mcp.js` exposes the same pipeline to coding agents over MCP
 (stdio): `generate_sprite`, `generate_sprite_sheet`, `generate_tileset`,
-`list_recipes`, `list_palette_profiles`, `list_models`. Tools write asset
-files into a caller-specified directory and return the paths, so an agent can
-generate art mid game-dev session without a human round-tripping through the
-browser.
+`fix_pixel_art` (offline repair — no network), `list_recipes`,
+`list_palette_profiles`, `list_models`. Tools write asset files into a
+caller-specified directory and return the paths, so an agent can generate
+art mid game-dev session without a human round-tripping through the browser.
 
 ```bash
 claude mcp add pixegen -- node /path/to/pixegen/bin/pixegen-mcp.js

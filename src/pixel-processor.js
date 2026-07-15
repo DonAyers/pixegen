@@ -24,6 +24,7 @@ import {
     sliceGridRaster,
     PIPELINE_MODES,
     DITHER_OPTIONS,
+    DOWNSCALE_OPTIONS,
 } from "./core/pipeline.js";
 import {
     PREPROCESSING_PRESETS,
@@ -31,7 +32,7 @@ import {
 } from "./core/preprocess.js";
 import { DEFAULT_PROFILE } from "./core/palettes.js";
 
-export { PIPELINE_MODES, DITHER_OPTIONS, PREPROCESSING_PRESETS };
+export { PIPELINE_MODES, DITHER_OPTIONS, DOWNSCALE_OPTIONS, PREPROCESSING_PRESETS };
 
 // ─── Browser plumbing ────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ export async function processSpriteSheet(sheetResult, options = {}) {
         spriteSize,
         dithering = null,
         pipeline = "enhanced",
+        downscale,
         outlines = true,
         cleanup = true,
         preprocessing = null,
@@ -161,6 +163,7 @@ export async function processSpriteSheet(sheetResult, options = {}) {
                     spriteSize,
                     dithering,
                     pipeline,
+                    downscale,
                     outlines,
                     cleanup,
                     preprocessing: null, // already applied batch-wide above
@@ -195,6 +198,7 @@ export async function processTileGrid(gridResult, options = {}) {
         spriteSize,
         dithering = null,
         pipeline = "enhanced",
+        downscale,
         outlines = true,
         cleanup = true,
         preprocessing = null,
@@ -221,6 +225,7 @@ export async function processTileGrid(gridResult, options = {}) {
                     spriteSize,
                     dithering,
                     pipeline,
+                    downscale,
                     outlines,
                     cleanup,
                     preprocessing: null, // already applied batch-wide above

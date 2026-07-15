@@ -16,14 +16,23 @@
  */
 
 import { parseArgs } from "node:util";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { RECIPES, DEFAULT_RECIPE } from "../src/core/recipes.js";
 import {
     PALETTE_PROFILES,
     SPRITE_SCALES,
+    parseSpriteSize,
 } from "../src/core/palettes.js";
+import { detectPixelGrid } from "../src/core/gridsize.js";
+import {
+    downscaleKCentroid,
+    quantizeOklab,
+    quantizeBitReduce,
+    quantizeKMeans,
+    estimateColorCount,
+} from "../src/core/quantize.js";
 import { PROVIDERS } from "../src/core/models.js";
 import { QUALITY_TIERS } from "../src/core/model-registry.js";
 import { listProviderAdapters } from "../src/node/providers/index.js";
@@ -59,7 +68,7 @@ import {
     saveFindings,
     findingsPath,
 } from "../src/node/eval-store.js";
-import { encodePng, imageExtension } from "../src/node/png.js";
+import { encodePng, decodeImage, imageExtension } from "../src/node/png.js";
 import { startRun, logFilePath } from "../src/node/run-log.js";
 import {
     generateSprite,
@@ -85,6 +94,16 @@ Usage:
   pixegen scales                        List sprite scale presets
   pixegen models [--live]               List AI models (--live syncs the
                                         catalog from Pollinations first)
+  pixegen fix <input> -o <out.png>      Offline: detect an upscaled/JPEG-
+                                        softened image's native pixel grid,
+                                        downscale back to it, optionally fix
+                                        colors. No network.
+        [--colors auto|N]               Reduce to N colors, or auto-estimate
+                                        via the elbow method (default: keep
+                                        detected colors as-is)
+        [--palette <profile>]           Quantize to a console palette
+                                        instead (see 'pixegen palettes')
+        [--scale <WxH>]                 Override the detected native size
 
 Eval loop (persistent ideal-settings knowledge base — see eval/README.md):
   pixegen eval status [--target nes]    Show per-target ideals + pending trials
@@ -107,6 +126,8 @@ Common options:
   -p, --palette <id>       Palette profile override (see 'pixegen palettes')
   -s, --size <WxH>         Sprite scale override, preset or custom (e.g. 32x32)
       --dither <mode>      '' or 'bayer' (enhanced pipeline)
+      --downscale <mode>   mode | average | k-centroid (overrides the
+                           pipeline's default downscale strategy)
       --preprocess <name>  ${Object.keys(PREPROCESSING_PRESETS).join(" | ")}
       --quality <tier>     low | medium | high | auto (passed to the provider)
       --seed <n>           Reproducible-ish seed (best-effort; OpenAI ignores it)
@@ -162,6 +183,9 @@ const COMMON_OPTIONS = {
     palette: { type: "string", short: "p" },
     size: { type: "string", short: "s" },
     dither: { type: "string" },
+    downscale: { type: "string" },
+    colors: { type: "string" },
+    scale: { type: "string" },
     preprocess: { type: "string" },
     quality: { type: "string" },
     seed: { type: "string" },
@@ -230,6 +254,7 @@ function generationOptions(values, runLog) {
         consoleId: values.palette,
         spriteSize: values.size,
         dithering: values.dither,
+        downscale: values.downscale,
         outlines: values["no-outlines"] ? false : undefined,
         cleanup: values["no-cleanup"] ? false : undefined,
         autoCrop: values["auto-crop"]
@@ -442,6 +467,77 @@ async function cmdTileset(prompt, values, runLog) {
     );
 }
 
+/**
+ * Offline pixel-art repair (Retro Diffusion Pixel Art Fixer parity, MIT
+ * source — docs/RETRO-DIFFUSION.md): detect the native pixel grid of an
+ * upscaled/JPEG-softened image, K-Centroid-downscale back to it, then an
+ * optional color-fix step. No network call.
+ */
+async function cmdFix(inputPath, values, runLog) {
+    if (values.colors && values.palette) {
+        throw new Error("--colors and --palette are mutually exclusive — pick one color step.");
+    }
+
+    const buffer = readFileSync(inputPath);
+    const source = decodeImage(buffer);
+    runLog.event("request", {
+        kind: "fix",
+        input: inputPath,
+        width: source.width,
+        height: source.height,
+    });
+
+    const detection = detectPixelGrid(source);
+    log(
+        `detected grid: spacing ${detection.spacingX}x${detection.spacingY}, ` +
+            `native ${detection.nativeW}x${detection.nativeH}, confidence ${detection.confidence.toFixed(2)}`,
+    );
+    if (detection.confidence < 0.5 && !values.scale) {
+        log(
+            `WARNING: low-confidence grid detection — "${inputPath}" may not be a clean pixel-art upscale. Override with --scale <WxH> if the result looks wrong.`,
+        );
+    }
+
+    let targetW = detection.nativeW;
+    let targetH = detection.nativeH;
+    if (values.scale) {
+        ({ w: targetW, h: targetH } = parseSpriteSize(values.scale));
+    }
+
+    let pixelData = downscaleKCentroid(source, targetW, targetH);
+
+    if (values.palette) {
+        const profile = getPaletteProfile(values.palette);
+        if (profile.quantizeMode === "bitreduce") {
+            pixelData = quantizeBitReduce(pixelData);
+        } else if (profile.quantizeMode === "palette") {
+            pixelData = quantizeOklab(pixelData, profile.palette);
+        }
+    } else if (values.colors) {
+        const colorCount =
+            values.colors === "auto"
+                ? estimateColorCount(pixelData)
+                : intOr(values.colors, 0);
+        if (!colorCount || colorCount < 1) {
+            throw new Error(
+                `--colors must be "auto" or a positive integer, got "${values.colors}".`,
+            );
+        }
+        log(
+            `quantizing to ${colorCount} colors${values.colors === "auto" ? " (auto-estimated)" : ""}`,
+        );
+        pixelData = quantizeKMeans(pixelData, colorCount);
+    }
+
+    const outPath = values.out || inputPath.replace(/\.[^/.]+$/, "") + ".fixed.png";
+    writeFile(outPath, encodePng(pixelData));
+    runLog.event("validation", { kind: "fix", detection });
+
+    console.log(
+        `${outPath} (${targetW}x${targetH}, spacing ${detection.spacingX}x${detection.spacingY}, confidence ${detection.confidence.toFixed(2)})`,
+    );
+}
+
 function cmdRecipes() {
     for (const [id, recipe] of Object.entries(RECIPES)) {
         console.log(
@@ -487,6 +583,7 @@ function settingsToGenerationOptions(settings, target) {
         consoleId: target,
         spriteSize: settings.spriteSize,
         dithering: settings.dithering === null ? "" : settings.dithering,
+        downscale: settings.downscale,
         outlines: settings.outlines,
         cleanup: settings.cleanup,
         autoCrop: settings.autoCrop,
@@ -732,6 +829,30 @@ async function main() {
     if (command === "idea") {
         const { values } = parseCli(rest);
         cmdIdea(values);
+        return;
+    }
+
+    if (command === "fix") {
+        const { values, positionals } = parseCli(rest);
+        if (values.help) {
+            console.log(HELP);
+            return;
+        }
+        const inputPath = positionals[0];
+        if (!inputPath) {
+            console.error(`The fix command needs an <input> image path.\n`);
+            process.exit(2);
+        }
+        const runLog = startRun("cli", { command, input: inputPath, args: rest.slice(1) });
+        try {
+            await cmdFix(inputPath, values, runLog);
+            runLog.end({ ok: true });
+        } catch (err) {
+            runLog.error(err, { command });
+            runLog.end({ ok: false });
+            err.runLogPath = logFilePath();
+            throw err;
+        }
         return;
     }
 

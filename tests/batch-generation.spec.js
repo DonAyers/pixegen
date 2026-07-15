@@ -54,7 +54,7 @@ test.describe("Batched generation resolution scaling", () => {
         const idlePerFrameWidth = idleRequest.width / 2;
 
         // Switch to walk (4 frames) and regenerate.
-        const animSelect = page.locator("select").nth(6);
+        const animSelect = page.locator("select").nth(7);
         await animSelect.selectOption("walk");
         await expect(page.getByText("1 / 4")).toBeVisible();
 
@@ -86,7 +86,7 @@ test.describe("Batched generation resolution scaling", () => {
             .getByPlaceholder("e.g. a knight with a sword")
             .fill("a blue mage");
 
-        const animSelect = page.locator("select").nth(6);
+        const animSelect = page.locator("select").nth(7);
         await animSelect.selectOption("walk"); // 4 frames — fits in one 2048px-wide request
         await page
             .getByRole("button", { name: /generate all frames/i })

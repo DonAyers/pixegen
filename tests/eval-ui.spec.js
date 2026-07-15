@@ -100,7 +100,7 @@ test.describe("Eval loop UI", () => {
         // Selects reflect the recorded ideal: size, dither, preprocessing
         await expect(page.locator("select").nth(1)).toHaveValue("48x48");
         await expect(page.locator("select").nth(4)).toHaveValue("bayer");
-        await expect(page.locator("select").nth(5)).toHaveValue("none");
+        await expect(page.locator("select").nth(6)).toHaveValue("none");
         // Outlines checkbox turned off by the ideal
         await expect(
             page.getByRole("checkbox", { name: /outlines/i }),
