@@ -1,142 +1,155 @@
-# Last session — Characters, the shared animation player, structured prompts, and engine exports
+# Last session — K-Centroid downscale, pixel grid detection, and `pixegen fix`
 
-*Session span: 2026-07-14 (following the eval/model-registry session).
-Companion docs: `Next-Phase.md` holds only what's next,
-`LESSONS.md` (new this session) holds only what generalizes; this doc holds
-only what just happened. Rinse, repeat — each session rewrites this one.*
+*Session span: 2026-07-14/15 (following the Characters/exports session).
+Companion docs: `RETRO-DIFFUSION.md` is the competitive research and
+decision record this session executed against; `plan-prompt.md` was the
+execution handoff prompt. `Next-Phase.md` holds only what's next,
+`LESSONS.md` holds only what generalizes; this doc holds only what just
+happened.*
 
 ## The brief
 
-Make the animation player solid (pull up and play any previously generated
-animation), add a **Characters** tab — a persistent identity layer above
-individual generations for repeatable, consistent animation sets — fix the
-visibly unstructured prompts, and make sprite-sheet output consumable by
-real engines (love2d, Godot, Unity, Phaser). User-approved scope decisions:
-full pass, all four engine formats (Aseprite JSON as the interchange core),
-and "both, model-dependent" consistency (locked description + seed always;
-reference image when the model supports it).
+Port three post-processing capabilities from Retro Diffusion's
+MIT-licensed `pixeldetector` into pixegen's portable core, phase by phase
+with a commit + green test suite after each: K-Centroid downscale, pixel
+grid detection, and an offline `pixegen fix` repair command, plus an
+advisory validation signal and a live eval sweep judging the new downscale
+strategy against the existing default. Hard constraint throughout: no
+behavior change by default — new strategies are opt-in until eval evidence
+promotes them.
 
 ## What shipped
 
-1. **Shared `AnimationPreview` component** (`src/AnimationPreview.jsx`) —
-   one playback UI (transport, FPS, ping-pong/onion-skin, clickable frame
-   strip) over the `AnimationPlayer` class; adopted by Generator, Explorer,
-   and Characters. `AnimationPlayer.seek(idx)` is now public API (Explorer
-   had been poking `_drawFrame`). Fixed en route: the Generator never
-   resynced player frames on animation-state change, and manual "Save
-   Frames" dropped `generationGroupId`/settings so re-saves fragmented in
-   the Explorer.
-2. **The frame-index bug** — `saveAllFrames` clobbered the caller's frame
-   index (`{ ...meta, frame: i }`, spread-order bug), so **every batch-saved
-   sheet frame persisted as `frame: 0`**. The Explorer masked it by
-   overwriting rows in its group-by; the Characters tab's dedup-by-frame
-   reader exposed it in one test run. Fixed (`{ frame: i, ...meta }`), plus
-   the Generator single-frame path now saves its real `currentFrame`. Rows
-   saved before 2026-07-14 may still carry `frame: 0`.
-3. **Structured prompt spec** (`core/prompts.js`) — prompts are an ordered
-   section object (format → style → subject → view → action → background)
-   rendered with sentence boundaries and numbered frame sequences, replacing
-   the flat comma pile; synonym stacks deduped in `VIEWS` ("side view,
-   profile view, facing right" → "side view, facing right"). Builder
-   signatures unchanged — CLI/MCP/eval callers untouched. New `styleNotes`
-   slot feeds a character's locked style text into every prompt.
-4. **Character entity + Characters tab** — Dexie v4: `characters` table
-   (locked `description`, `styleNotes`, palette/scale/model prefs,
-   `baseSeed`, reference image blob + upstream URL), `characterId` FK on
-   sprites with `[characterId+animState+view]` index, `adoptSpritesByName()`
-   linking legacy Generator saves. `src/Characters.jsx`: create/edit, per-
-   character animation grid with the shared player, generate-animation flow
-   (locked subject + base seed + `image=` reference when the model's
-   `maxReferenceImages > 0` — browser counterpart of the Node cohesion
-   chain; `img._upstreamUrl` reconstructs the public URL from the proxy
-   path), auto-anchoring first generation as reference, "Use as reference"
-   promotion (sprite rows now persist `sourceUrl` for this), and per-model
-   capability messaging.
-5. **Sheet model + multi-engine export** (`core/exporters.js`) — one
-   internal model (multi-animation multi-row packing, per-frame durations,
-   bottom-center pivots, padding) with five pure emitters behind
-   `EXPORT_FORMATS`: Phaser (existing `atlas.js` became a thin compatible
-   wrapper), **Aseprite JSON** (frameTags + ms durations), **Godot 4
-   `.tres` SpriteFrames**, **love2d data-only `.lua`**, **Unity metadata**
-   (bottom-left-origin rects, inverted pivot y). CLI:
-   `pixegen sheet --format phaser,aseprite,godot,love2d,unity`. Browser:
-   `buildPackedSheet` in `sprite-sheet.js` + an "Export Character" button
-   (one PNG, one row per animation, one metadata file; format picker).
-6. **Tests + docs** — `tests/characters.spec.js` (4 browser tests: CRUD,
-   locked-seed generation + playback, packed export downloads, legacy
-   adoption) and `tests/exporters.spec.js` (11 pure-core tests: packing
-   geometry, padding, every emitter's format contract, Phaser wrapper
-   compatibility). CLAUDE.md updated throughout; `docs/LESSONS.md` created.
+1. **K-Centroid downscale** (`core/quantize.js`: `downscaleKCentroid`) —
+   per-tile k-means (k=2 default) over opaque colors, emitting the most
+   common resulting centroid. `pipeline.js` gained a `downscale` option
+   (`'mode' | 'average' | 'k-centroid'`, defaulting to each pipeline's
+   existing strategy) plumbed through recipes, the CLI's `--downscale`
+   flag, the MCP tool schemas, a new Downscale select in the Generator and
+   A/B Test Lab, and the eval-findings settings whitelist.
+   `tests/kcentroid.spec.js` proves it recovers a two-color-per-tile noisy
+   source exactly where plain averaging never can.
+2. **Pixel grid detection** (new `core/gridsize.js`: `detectPixelGrid` +
+   `findPeaks`) — per-axis edge-energy profiles, hand-rolled peak-finding
+   (prominence + minimum distance), median peak-gap as spacing. Recovers
+   native resolution from an upscaled or JPEG-softened image; confidence
+   scores peak-gap regularity so callers can ignore low-confidence hits
+   (photos, flat images). `tests/gridsize.spec.js`: 3x/5x/7x upscales,
+   a box-blurred (JPEG-softness) upscale, random noise, and a
+   native-resolution sprite that must not false-positive a larger grid.
+3. **`pixegen fix`** (CLI + `fix_pixel_art` MCP tool) — offline repair, no
+   network: decode → `detectPixelGrid` → `downscaleKCentroid` to the
+   detected (or `--scale`-overridden) native size → optional
+   `--palette <profile>` or `--colors N|auto`. `--colors auto` uses a new
+   elbow-method `estimateColorCount` (k-means at increasing k, log-space
+   second-difference peak — see LESSONS.md for why raw distortion doesn't
+   work) and a new `quantizeKMeans` (whole-image k-means color reduction).
+   Getting the elbow method reliable required fixing `kMeansRGB`'s
+   centroid seeding (fixed-stride → deterministic farthest-point/
+   greedy-k-center), which also improved K-Centroid downscale's cluster
+   quality as a side effect. `tests/fix.spec.js`: CLI-subprocess spec plus
+   an `estimateColorCount` unit test against a known 6-color image.
+4. **Advisory grid-size validation signal** (`src/node/generate.js`) —
+   every `generateSprite` attempt runs `detectPixelGrid` on the raw source
+   (before downscale) and logs a `grid-size-mismatch` warning when a
+   high-confidence detection disagrees with the requested sprite size by
+   >25%. Deliberately never fails validation or triggers the retry — we're
+   gathering signal, not gating on it yet. Verified against a mock
+   provider serving a genuinely-coarse 8x8-native image at a 32x32
+   request: correctly logged without touching the pass/fail outcome.
+5. **Live eval sweep, downscale axis** — 3 trials (funded key, `source
+   .env`) at nes and gameboy's current ideal settings, judged by eye:
+   nes tied (marginal edge-softness difference, not decisive — recipe left
+   alone); gameboy won twice decisively (mode downscale was losing
+   subject detail at the aggressive 16x16 factor, in one trial almost
+   entirely). Promoted `gameboy-tiny`'s recipe to `downscale: "k-centroid"`
+   with citation in its description, following the existing style.
 
-Verification state at session end: **50/50 Playwright tests passing**
-(`integration.spec.js` excluded as the documented stale pre-React suite),
-prod build clean, CLI sheet export verified end-to-end against a mock
-server in all five formats.
+Verification state at session end: **all Playwright tests passing**
+(`integration.spec.js` excluded as the documented stale pre-React suite —
+unaffected by this session), CLI `fix` verified end-to-end against a real
+upscaled-sprite fixture, mock-server smoke test confirmed
+`--downscale k-centroid` byte-differs from the untouched default while the
+default itself stays byte-identical across runs, MCP `fix_pixel_art` tool
+verified via a live stdio round-trip (tool list + call).
 
 ## Forks in the road, and which way we went
 
-- **Consistency mechanism: prompt+seed vs reference-image vs both** → both,
-  model-dependent (user's call). Locked description + seed always; the
-  reference URL rides along only when the model accepts it, and the UI says
-  which is happening.
-- **Character storage: new entity table vs keep grouping by name string** →
-  entity table with additive migration. Legacy rows keep working by name;
-  adoption is lazy and non-destructive.
-- **Reference URL source** → the generation request URL itself (matches the
-  Node cohesion chain's semantics — deterministic re-generation), stored at
-  save time on both the character and sprite rows.
-- **Export architecture: per-format builders vs one model + emitters** →
-  one model, thin emitters. Geometry is tested once; formats are ~40 lines
-  each.
-- **Prompt rewrite depth: new text vs structure-with-conservative-wording**
-  → conservative. Proven tokens kept; structure, dedup, and numbering are
-  the change. Wording experiments belong to the eval loop, not a refactor.
-- **Characters tab prompt fields: reuse Generator's full knob set vs locked
-  minimal set** → minimal (palette/scale/model/seed + description/style
-  notes); pipeline knobs stay at sane defaults. The tab's job is
-  repeatability, not exploration — that's what Generator and A/B are for.
+- **Elbow-method formula: literal raw second-difference vs. normalized** →
+  normalized (log-space). The plan's literal wording ("peak of the
+  improvement-rate second difference") picked k=2 on every test seed
+  against a real distortion curve; empirically verifying against a
+  known-color-count synthetic image (rather than trusting the formula on
+  paper) caught this before it shipped. See LESSONS.md.
+- **K-Centroid downscale test design: literal per-pixel jitter vs.
+  two-cluster-per-tile noise** → two-cluster (bleed) noise. Pure symmetric
+  per-pixel jitter with no genuine second cluster in a tile actually favors
+  plain averaging (it uses all N tile samples; K-Centroid's cluster split
+  uses fewer) — verified empirically before locking in test expectations,
+  not assumed from the algorithm's stated purpose.
+- **Phase 4's scope: all three generation flows vs. sprite-only** → sprite
+  only. The plan's wording was singular ("the source"); sheets/tilesets
+  batch multiple frames per request, so "requested sprite size" doesn't
+  map 1:1 to one source raster the same way. Left as a clean, scoped
+  extension rather than forcing an ambiguous generalization.
+- **Downscale UI default: hardcode "mode"/"average" in the select vs. an
+  explicit "Auto" option** → explicit "Auto (pipeline default)" as the
+  select's default value (empty string), so switching pipelines can't
+  silently strand the downscale choice at a stale explicit value — matches
+  the "no behavior change unless the caller opts in" constraint exactly.
+- **gameboy-tiny promotion threshold** → 2 decisive (non-tie) trials on a
+  second prompt/seed, not just the first win. The first trial's difference
+  was dramatic enough to look conclusive on its own, but recipes ship to
+  everyone — one more trial with an explicit champion reset (see the
+  eval-champion-inheritance gotcha in LESSONS.md) confirmed it wasn't a
+  one-off before editing `recipes.js`.
 
 ## Cans kicked down the road (deliberately)
 
-- **Eval-validate the new prompt wording** — structure changed, wording
-  changed slightly; nobody has A/B'd old-vs-new prompt text through
-  `eval run` yet. Do this before trusting recipe ideals recorded against
-  the old prompts.
-- **Reference-cohesion quality is still unjudged** — the browser lane now
-  *uses* `image=` refs for ref-capable models, but whether it measurably
-  improves cross-animation identity hasn't been eyeballed via the eval loop.
-- **MCP export formats** — `bin/pixegen-mcp.js` still emits Phaser only; a
-  `format` tool param is a small follow-up.
-- **CompareLab still hand-wires `AnimationPlayer`** — third candidate for
-  `AnimationPreview` adoption.
-- **Legacy `frame: 0` rows** — pre-2026-07-14 batch saves can't be reliably
-  re-indexed; they play as single frames. Regenerate if it matters.
-- **Per-frame durations in the UI** — the sheet model supports them; the
-  player and export UI only expose uniform fps.
-- **App.jsx decomposition, browser validation gate,
-  `tests/integration.spec.js`, `exportGif`** — all unchanged, all still on
-  the list.
+- **nes's downscale axis** — tied once, not decisive either way.
+  `nes-classic`'s recipe is untouched; more trials (different sources,
+  maybe a noisier model) could tip it either direction.
+- **`--colors`/`--palette` on sheets/tilesets** — `pixegen fix` operates on
+  a single already-flattened image; sheet-aware repair (fix each frame of
+  an existing strip consistently) isn't built.
+- **Grid-detection advisory signal has no consumer yet** — it's logged to
+  JSONL and nothing reads it back out. A `pixegen eval status`-style
+  aggregate ("N% of generations show grid mismatch, by model") would turn
+  the gathered signal into an actual decision input.
+- **`estimateColorCount` at `maxColors: 128` is ~4s on a 64x64 image** —
+  fine for `pixegen fix` (runs on the small post-downscale native image,
+  not the large source), but worth remembering if it's ever called on a
+  bigger raster.
+- **Full downscale-axis sweep beyond nes/gameboy** — snes/genesis/c64/atari
+  untested; the plan scoped this session to "at least nes and gameboy."
 
 ## What worked well
 
-- **Exploration-first paid off**: three parallel read-only surveys
-  (player/storage, prompts/export, tab wiring) up front meant every later
-  edit hit a known seam — the CompareLab template made the Characters tab
-  mostly assembly.
-- **The new reader caught an old bug immediately** — writing
-  `loadCharacterFrames` strictly (dedupe by frame index) surfaced the
-  frame-index bug that the tolerant Explorer had masked. See LESSONS.md.
-- **Pure-core exporters were testable in minutes** because Playwright specs
-  run in Node — 11 geometry/format tests with zero browser overhead.
+- **Empirically verifying algorithm behavior before writing test
+  expectations, every phase.** Both the elbow method and the K-Centroid
+  test design would have shipped with silently-wrong or misleadingly-easy
+  tests if the expected numbers had been guessed from the algorithm
+  description instead of measured with a scratch script first.
+- **Phase-by-phase commits with a full green suite between each** caught
+  the kMeansRGB seeding regression risk immediately — Phase 3's seeding
+  fix touched code Phase 1 had already shipped and tested, and rerunning
+  `tests/kcentroid.spec.js` before moving on confirmed no silent
+  regression instead of finding out at the end.
+- **Live eval trials over trusting the algorithm's stated purpose.** The
+  RETRO-DIFFUSION.md research said K-Centroid is noise-robust; the actual
+  live trials showed *where* — clearly on gameboy's aggressive 16x16
+  downscale, genuinely tied on nes's gentler 32x32 — evidence a synthetic
+  benchmark alone wouldn't have produced.
 
 ## What didn't work as well
 
-- **Chakra `Button` accessible-name confusion** — an `aria-label` on a text
-  Button ("▶") does win as the accessible name, but the first test run
-  failed for a different reason (the frame bug) and the label red herring
-  cost one investigation loop. Snapshot-first debugging (`error-context.md`)
-  found the truth faster than re-reading component code.
-- **The mock PNG is a checkerboard-free flat color** — slicing/processing
-  tests pass but can't catch content-dependent regressions (auto-crop,
-  palette conformance). Fine for machinery, but it's worth remembering what
-  the mocks *can't* see.
+- **First live eval trial silently 401'd inside `run_in_background`**
+  despite `source .env` succeeding in every foreground check — cost one
+  wasted trial (real API attempt, immediate failure) before isolating it
+  to background-execution env propagation. `set -a; source .env; set +a`
+  fixed it; see LESSONS.md's environment-quirks section.
+- **First champion-reset attempt for the second gameboy trial also
+  silently no-oped** (`--champion` without the `downscale` key let the
+  already-won value ride through) — caught by `eval run`'s own "identical
+  to champion" guard rather than a wasted generation, but worth the
+  explicit lesson entry since it'll recur on any axis re-test.

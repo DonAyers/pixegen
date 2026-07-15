@@ -5,6 +5,33 @@ debugging loop (or a whole session) to learn, kept so they only have to be
 learned once. Dated by when the lesson landed. `docs/last-sesh.md` holds the
 narrative of the most recent session; this file holds only what generalizes.
 
+## Algorithms
+
+**K-means centroid seeding determines whether "more clusters" is even
+monotonically better** (2026-07-15). `estimateColorCount`'s elbow method
+needs distortion(k) to (roughly) decrease as k grows — that's the entire
+premise of "find where it flattens." Fixed-stride/index-based seeding
+(pick every Nth sample as an initial centroid) produced a *non-monotonic*
+curve once k passed ~6: some larger k landed in a worse local optimum than
+a smaller k, because arbitrary index-based seeds can double up inside one
+true cluster and leave another cluster unseeded. Deterministic
+farthest-point sampling (start at the min-luma point, repeatedly add
+whichever remaining point is farthest from every centroid chosen so far —
+greedy k-center) fixed it completely and is still RNG-free/reproducible.
+If a k-means-derived signal ever misbehaves as k grows, check the seeding
+before the math.
+
+**Elbow detection must run in log-distortion space, not raw distortion.**
+A k-means distortion curve decays roughly geometrically with k, so the
+raw discrete second difference is dominated by the huge absolute drops at
+small k — on a real curve this picked k=2 for a known-6-color test image
+every time, regardless of where the curve actually flattened. Taking the
+second difference of `log(distortion + 1)` instead (log-drop ≈ percentage
+improvement, which is what "improvement rate" should mean) fixed it to
+6/6 across 8 seeds. Any curve that decays multiplicatively needs its
+"rate of change" measured on a log or relative scale, not an absolute one
+— true for elbow methods generally, not just this one.
+
 ## Testing & verification
 
 **Mock-only verification can hide a total-failure bug indefinitely**
@@ -88,6 +115,20 @@ fetch the reference itself — must reconstruct the upstream equivalent
 `/api/pollinations/<path>` proxy path. Strip client-only markers
 (`pixegen_free=1`) too.
 
+**`eval run`'s auto-picked champion silently inherits whatever already won**
+(2026-07-15). Champion resolution is `{...baseline, ...idealSettingsForTarget(...)}`
+merged with any `--champion` override — but the override only *overwrites
+keys it names*. Once a trial records axis X as a winner, that value lives in
+`eval/findings.json`'s ideal and becomes part of every later "current
+ideal" champion, including one meant to re-test axis X against its old
+default: `--champion '{"otherKey": ...}'` (no mention of X) silently
+carries the winning X-value through, so the "champion vs challenger" trial
+ends up comparing X against itself (`eval run` correctly refuses this with
+"Challenger settings are identical to the champion", which is the tell).
+To re-test an axis that has already won once, explicitly reset it in
+`--champion` (e.g. `"downscale": null`), don't rely on the auto-picked
+baseline.
+
 **Live-API latency variance dominates wall-clock planning** (2026-07-13).
 The same flux call ranged 1.8 s off-peak to 9+ min under queue congestion —
 it's queuing, not inference. Design responses: parallel batches, slow-request
@@ -133,3 +174,8 @@ pivot y is inverted relative to ours.
   (2026-07-13).
 - Anonymous-tier Pollinations 401s from this environment; the funded key in
   `.env` works.
+- `source .env` in a foreground shell call exports for that call's child
+  processes fine, but a script run via the harness's background-execution
+  path needs `set -a; source .env; set +a` (force-export) or the sourced
+  vars don't reach the spawned `node` process and generation 401s with "no
+  POLLINATIONS_API_KEY set" even though the key is right there (2026-07-15).
