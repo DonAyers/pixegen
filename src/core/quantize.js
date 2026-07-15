@@ -124,22 +124,24 @@ export function downscaleAverage(sourceData, targetW, targetH) {
 /**
  * K-means cluster a flat [r,g,b,r,g,b,...] array into up to `k` clusters
  * with a few iterations of Lloyd's algorithm. Centroids are seeded
- * deterministically (min/max luma pixels, then evenly-spaced samples for
- * k > 2) so output is reproducible without an RNG.
+ * deterministically via farthest-point sampling (greedy k-center, starting
+ * from the min-luma pixel) so output is reproducible without an RNG.
  * Ported from Astropulse/pixeldetector (MIT).
  *
- * @returns {{ centroids: number[][], counts: number[] }} - counts[i] is how
- *   many points ended up assigned to centroids[i]
+ * @returns {{ centroids: number[][], counts: number[], distortion: number }}
+ *   - counts[i] is how many points ended up assigned to centroids[i];
+ *   distortion is the total squared distance from every point to its
+ *   assigned centroid (the elbow-method input for estimateColorCount)
  */
 function kMeansRGB(rgb, k, iterations = 5) {
     const n = rgb.length / 3;
-    if (n === 0) return { centroids: [[0, 0, 0]], counts: [0] };
-    if (n === 1) return { centroids: [[rgb[0], rgb[1], rgb[2]]], counts: [1] };
+    if (n === 0) return { centroids: [[0, 0, 0]], counts: [0], distortion: 0 };
+    if (n === 1) {
+        return { centroids: [[rgb[0], rgb[1], rgb[2]]], counts: [1], distortion: 0 };
+    }
 
     let minLuma = Infinity;
-    let maxLuma = -Infinity;
     let minIdx = 0;
-    let maxIdx = 0;
     for (let i = 0; i < n; i++) {
         const luma =
             0.299 * rgb[i * 3] + 0.587 * rgb[i * 3 + 1] + 0.114 * rgb[i * 3 + 2];
@@ -147,22 +149,45 @@ function kMeansRGB(rgb, k, iterations = 5) {
             minLuma = luma;
             minIdx = i;
         }
-        if (luma > maxLuma) {
-            maxLuma = luma;
-            maxIdx = i;
+    }
+
+    // Deterministic farthest-point (greedy k-center) seeding: start at the
+    // min-luma pixel, then repeatedly add whichever remaining point is
+    // farthest from every centroid chosen so far. No RNG, and it spreads
+    // centroids across genuinely distinct clusters — unlike fixed-stride
+    // sampling, which degrades badly (non-monotonic distortion vs. k) once
+    // k grows past a handful of clusters.
+    const kEff = Math.max(1, Math.min(k, n));
+    const centroids = [[rgb[minIdx * 3], rgb[minIdx * 3 + 1], rgb[minIdx * 3 + 2]]];
+    const nearestCentroidDistSq = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+        const dr = rgb[i * 3] - centroids[0][0];
+        const dg = rgb[i * 3 + 1] - centroids[0][1];
+        const db = rgb[i * 3 + 2] - centroids[0][2];
+        nearestCentroidDistSq[i] = dr * dr + dg * dg + db * db;
+    }
+    while (centroids.length < kEff) {
+        let farIdx = 0;
+        let farDist = -1;
+        for (let i = 0; i < n; i++) {
+            if (nearestCentroidDistSq[i] > farDist) {
+                farDist = nearestCentroidDistSq[i];
+                farIdx = i;
+            }
+        }
+        const next = [rgb[farIdx * 3], rgb[farIdx * 3 + 1], rgb[farIdx * 3 + 2]];
+        centroids.push(next);
+        for (let i = 0; i < n; i++) {
+            const dr = rgb[i * 3] - next[0];
+            const dg = rgb[i * 3 + 1] - next[1];
+            const db = rgb[i * 3 + 2] - next[2];
+            const d = dr * dr + dg * dg + db * db;
+            if (d < nearestCentroidDistSq[i]) nearestCentroidDistSq[i] = d;
         }
     }
 
-    const kEff = Math.max(1, Math.min(k, n));
-    const seedAt = (i) => [rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]];
-    const centroids = [seedAt(minIdx)];
-    if (kEff > 1) centroids.push(seedAt(maxIdx));
-    for (let c = 2; c < kEff; c++) {
-        centroids.push(seedAt(Math.floor((c / kEff) * n)));
-    }
-
     const assignment = new Int32Array(n);
-    for (let iter = 0; iter < iterations; iter++) {
+    const assign = () => {
         for (let i = 0; i < n; i++) {
             const r = rgb[i * 3];
             const g = rgb[i * 3 + 1];
@@ -179,7 +204,8 @@ function kMeansRGB(rgb, k, iterations = 5) {
             }
             assignment[i] = best;
         }
-
+    };
+    const update = () => {
         const sums = centroids.map(() => [0, 0, 0, 0]);
         for (let i = 0; i < n; i++) {
             const c = assignment[i];
@@ -197,11 +223,133 @@ function kMeansRGB(rgb, k, iterations = 5) {
                 ];
             }
         }
+    };
+
+    for (let iter = 0; iter < iterations; iter++) {
+        assign();
+        update();
     }
+    assign(); // final assignment against the converged centroids
 
     const counts = new Array(centroids.length).fill(0);
-    for (let i = 0; i < n; i++) counts[assignment[i]]++;
-    return { centroids, counts };
+    let distortion = 0;
+    for (let i = 0; i < n; i++) {
+        const c = assignment[i];
+        counts[c]++;
+        const [cr, cg, cb] = centroids[c];
+        const dr = rgb[i * 3] - cr;
+        const dg = rgb[i * 3 + 1] - cg;
+        const db = rgb[i * 3 + 2] - cb;
+        distortion += dr * dr + dg * dg + db * db;
+    }
+    return { centroids, counts, distortion };
+}
+
+/**
+ * Estimate a natural color count via the elbow method: k-means at
+ * increasing k, track total squared distortion, and return the k where the
+ * improvement rate's decline peaks (diminishing returns past that point) —
+ * a free-palette "how many colors does this image actually use" heuristic
+ * that needs no user input.
+ * Ported from Astropulse/pixeldetector (MIT).
+ *
+ * @param {{ data, width, height }} raster
+ * @param {object} [options]
+ * @param {number} [options.maxColors=128] - Upper bound on k to try
+ * @returns {number} Estimated natural color count (>= 1)
+ */
+export function estimateColorCount(raster, { maxColors = 128 } = {}) {
+    const { data, width, height } = raster;
+    const totalPixels = width * height;
+    // Sample (strided) to cap the k-means input size for speed on large images.
+    const SAMPLE_CAP = 10000;
+    const stride = Math.max(1, Math.floor(totalPixels / SAMPLE_CAP));
+    const samples = [];
+    const seen = new Set();
+    for (let p = 0; p < totalPixels; p += stride) {
+        const i = p * 4;
+        if (data[i + 3] < 10) continue;
+        samples.push(data[i], data[i + 1], data[i + 2]);
+        seen.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
+    }
+    if (samples.length === 0) return 1;
+
+    const kMax = Math.max(1, Math.min(maxColors, seen.size));
+    if (kMax <= 2) return kMax;
+
+    const distortions = [0]; // distortions[k] for k=1..kMax; index 0 unused
+    for (let k = 1; k <= kMax; k++) {
+        distortions.push(kMeansRGB(samples, k, 6).distortion);
+    }
+
+    // K-means distortion decays roughly geometrically with k, so the
+    // improvement *rate* is naturally a log-space quantity (log-distortion
+    // drop == percentage improvement) — taking the second difference on
+    // raw distortion is dominated by the huge absolute drops at small k
+    // regardless of where the curve actually flattens. In log space the
+    // elbow (peak second difference = sharpest bend from steep decline to
+    // diminishing returns) lands where added colors stop paying for
+    // themselves.
+    const logDistortions = distortions.map((d) => Math.log(d + 1));
+    let bestK = 1;
+    let bestScore = -Infinity;
+    for (let k = 2; k < kMax; k++) {
+        const score =
+            logDistortions[k - 1] - 2 * logDistortions[k] + logDistortions[k + 1];
+        if (score > bestScore) {
+            bestScore = score;
+            bestK = k;
+        }
+    }
+    return bestK;
+}
+
+/**
+ * Quantize a whole raster to k colors via k-means: cluster its opaque
+ * pixel colors into k clusters and replace each opaque pixel with its
+ * nearest centroid. The free-palette counterpart of quantizeOklab's fixed
+ * lookup table — behind `pixegen fix --colors N`.
+ *
+ * @param {{ data, width, height }} raster
+ * @param {number} k
+ * @returns {{ data, width, height }}
+ */
+export function quantizeKMeans(raster, k) {
+    const { data } = raster;
+    const result = cloneRaster(raster);
+    const dst = result.data;
+
+    const rgb = [];
+    const pixelIndices = [];
+    for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 10) continue;
+        rgb.push(data[i], data[i + 1], data[i + 2]);
+        pixelIndices.push(i);
+    }
+    if (rgb.length === 0) return result;
+
+    const { centroids } = kMeansRGB(rgb, k, 8);
+
+    for (let p = 0; p < pixelIndices.length; p++) {
+        const i = pixelIndices[p];
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        let best = 0;
+        let bestDist = Infinity;
+        for (let c = 0; c < centroids.length; c++) {
+            const [cr, cg, cb] = centroids[c];
+            const d = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
+            if (d < bestDist) {
+                bestDist = d;
+                best = c;
+            }
+        }
+        dst[i] = Math.round(centroids[best][0]);
+        dst[i + 1] = Math.round(centroids[best][1]);
+        dst[i + 2] = Math.round(centroids[best][2]);
+    }
+    return result;
 }
 
 /**

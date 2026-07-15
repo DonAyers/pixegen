@@ -17,14 +17,19 @@
  * to stderr.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { dirname, join, resolve, basename, extname } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
 import { RECIPES, DEFAULT_RECIPE } from "../src/core/recipes.js";
-import { PALETTE_PROFILES, SPRITE_SCALES } from "../src/core/palettes.js";
+import {
+    PALETTE_PROFILES,
+    SPRITE_SCALES,
+    getPaletteProfile,
+    parseSpriteSize,
+} from "../src/core/palettes.js";
 import { PROVIDERS } from "../src/core/models.js";
 import { listProviderAdapters } from "../src/node/providers/index.js";
 import { getPollinationsCatalog } from "../src/node/live-models.js";
@@ -36,7 +41,15 @@ import {
     buildPoseDescription,
 } from "../src/animation-states.js";
 import { TILE_ROLES, getRoleHint } from "../src/tile-roles.js";
-import { encodePng } from "../src/node/png.js";
+import { encodePng, decodeImage } from "../src/node/png.js";
+import { detectPixelGrid } from "../src/core/gridsize.js";
+import {
+    downscaleKCentroid,
+    quantizeOklab,
+    quantizeBitReduce,
+    quantizeKMeans,
+    estimateColorCount,
+} from "../src/core/quantize.js";
 import {
     generateSprite,
     generateSheet,
@@ -437,6 +450,123 @@ server.registerTool(
             attempts: result.attempts,
             issues: result.issues,
         });
+        }),
+);
+
+server.registerTool(
+    "fix_pixel_art",
+    {
+        title: "Fix / repair pixel art",
+        description:
+            "Offline repair of an upscaled or JPEG-softened pixel-art image (Retro Diffusion Pixel Art Fixer parity): detects the image's true pixel grid, downscales back to native resolution with the noise-robust K-Centroid algorithm, and optionally fixes colors. No network call — works on any local PNG or JPEG.",
+        inputSchema: {
+            input: z.string().describe("Path to the source PNG or JPEG image to fix."),
+            outDir: z
+                .string()
+                .describe("Directory to write the fixed PNG into (created if missing)."),
+            baseName: z
+                .string()
+                .optional()
+                .describe("Base filename without extension (default: derived from the input filename)."),
+            colors: z
+                .union([z.literal("auto"), z.number().int().min(1)])
+                .optional()
+                .describe(
+                    "Reduce to N colors via k-means, or 'auto' to estimate the natural color count via the elbow method. Omit to keep detected colors as-is. Mutually exclusive with palette.",
+                ),
+            palette: z
+                .string()
+                .optional()
+                .describe(
+                    "Quantize to a console palette profile instead of k-means color reduction (see list_palette_profiles). Mutually exclusive with colors.",
+                ),
+            scale: z
+                .string()
+                .optional()
+                .describe(
+                    'Override the detected native size, "WxH" (e.g. "32x32") — use when detection confidence is low.',
+                ),
+        },
+        outputSchema: {
+            file: z.string().describe("Path of the fixed PNG"),
+            width: z.number(),
+            height: z.number(),
+            spacingX: z.number().describe("Detected horizontal pixel spacing"),
+            spacingY: z.number().describe("Detected vertical pixel spacing"),
+            confidence: z
+                .number()
+                .describe(
+                    "Grid-detection confidence, 0-1; low values mean the input may not be a clean pixel-art upscale",
+                ),
+        },
+    },
+    async (args) =>
+        withRunLog("fix_pixel_art", args, async (runLog) => {
+            if (args.colors !== undefined && args.palette) {
+                throw new Error(
+                    "colors and palette are mutually exclusive — pick one color step.",
+                );
+            }
+
+            const buffer = readFileSync(args.input);
+            const source = decodeImage(buffer);
+            runLog.event("request", {
+                kind: "fix",
+                input: args.input,
+                width: source.width,
+                height: source.height,
+            });
+
+            const detection = detectPixelGrid(source);
+
+            let targetW = detection.nativeW;
+            let targetH = detection.nativeH;
+            if (args.scale) {
+                ({ w: targetW, h: targetH } = parseSpriteSize(args.scale));
+            }
+
+            let pixelData = downscaleKCentroid(source, targetW, targetH);
+
+            if (args.palette) {
+                const profile = getPaletteProfile(args.palette);
+                if (profile.quantizeMode === "bitreduce") {
+                    pixelData = quantizeBitReduce(pixelData);
+                } else if (profile.quantizeMode === "palette") {
+                    pixelData = quantizeOklab(pixelData, profile.palette);
+                }
+            } else if (args.colors !== undefined) {
+                const colorCount =
+                    args.colors === "auto" ? estimateColorCount(pixelData) : args.colors;
+                pixelData = quantizeKMeans(pixelData, colorCount);
+            }
+
+            const base = args.baseName || slugify(basename(args.input, extname(args.input)));
+            const file = writeFile(join(args.outDir, `${base}.fixed.png`), encodePng(pixelData));
+            runLog.event("validation", { kind: "fix", detection });
+
+            const lowConfidenceNote =
+                detection.confidence < 0.5
+                    ? " (low confidence — pass scale to override if the result looks wrong)"
+                    : "";
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text:
+                            `Wrote ${file}\n` +
+                            `${targetW}x${targetH}, detected spacing ${detection.spacingX}x${detection.spacingY}, ` +
+                            `confidence ${detection.confidence.toFixed(2)}${lowConfidenceNote}`,
+                    },
+                ],
+                structuredContent: {
+                    file,
+                    width: targetW,
+                    height: targetH,
+                    spacingX: detection.spacingX,
+                    spacingY: detection.spacingY,
+                    confidence: detection.confidence,
+                },
+            };
         }),
 );
 
