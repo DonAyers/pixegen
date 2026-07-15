@@ -8,6 +8,12 @@
  * silently writing it to disk. See docs/Next-Phase.md §4.
  *
  * Every check returns issue strings; empty array = pass.
+ *
+ * Grid-size disagreement (detected native pixel grid of the *source*, pre-
+ * downscale, vs. the requested sprite size) is a separate advisory-only
+ * signal, not a pass/fail check here — these functions only ever see the
+ * processed output, never the source raster grid detection runs against.
+ * See `logGridSizeAdvisory` in src/node/generate.js.
  */
 
 const ALPHA_OPAQUE_THRESHOLD = 10;
