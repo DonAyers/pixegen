@@ -21,15 +21,16 @@
         "model": "flux",
         "spriteSize": "16x16",
         "pipeline": "enhanced",
+        "downscale": "k-centroid",
         "dithering": null,
         "outlines": true,
         "cleanup": true,
         "autoCrop": true,
         "preprocessing": "standard"
       },
-      "trials": 1,
-      "updatedAt": "2026-07-14T02:47:45.889Z",
-      "lastTrialId": "tmrk1uilqtc"
+      "trials": 3,
+      "updatedAt": "2026-07-15T02:21:10.405Z",
+      "lastTrialId": "tmrlgdufgrg"
     }
   },
   "trials": [
@@ -277,6 +278,106 @@
       "notes": "Without the orphan-cleanup pass, stray single blue/orange pixels survive around the sprite (helmet, sword base, right edge); with cleanup the same frame is speckle-free and otherwise identical. Cleanup stays on.",
       "source": "cli",
       "judgedAt": "2026-07-14T17:21:50.866Z"
+    },
+    {
+      "id": "tmrlgalcbia",
+      "date": "2026-07-15T02:18:10.955Z",
+      "target": "nes",
+      "prompt": "a feral alchemist with a grappling hook, inspired by Kid Icarus",
+      "seed": 3751,
+      "model": "zimage",
+      "a": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "none"
+      },
+      "b": {
+        "model": "zimage",
+        "spriteSize": "32x32",
+        "pipeline": "enhanced",
+        "downscale": "k-centroid",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "none"
+      },
+      "winner": "tie",
+      "notes": "K-Centroid vs mode downscale on a zimage source at ideal nes settings: near-identical silhouette and palette; B (k-centroid) has a slightly muddier/softer transition at the right shoulder-to-background boundary where A (mode) keeps a crisper edge, but the difference is marginal and wouldn't affect shippability either way. Need more trials before this axis moves the ideal.",
+      "source": "cli",
+      "judgedAt": "2026-07-15T02:18:51.729Z"
+    },
+    {
+      "id": "tmrlgbyezjp",
+      "date": "2026-07-15T02:19:14.555Z",
+      "target": "gameboy",
+      "prompt": "a cybernetic goo dragon, inspired by Pokémon Red",
+      "seed": 2216,
+      "model": "flux",
+      "a": {
+        "model": "flux",
+        "spriteSize": "16x16",
+        "pipeline": "enhanced",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "standard"
+      },
+      "b": {
+        "model": "flux",
+        "spriteSize": "16x16",
+        "pipeline": "enhanced",
+        "downscale": "k-centroid",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "standard"
+      },
+      "winner": "b",
+      "notes": "At 16x16, mode downscale (A) drops almost all subject detail -- the frame is nearly blank background with a few scattered stray pixels, unreadable as a dragon. K-Centroid (B) recovers substantially more structure (a body outline, a horizontal tail/arm bar, an eye dot) because it clusters each tile's colors instead of taking a strict per-pixel mode, so minority-but-substantial subject-color clusters within a tile survive instead of losing to background on a technicality. Neither is a great sprite, but B is meaningfully more readable. First decisive win for k-centroid — worth another trial or two on gameboy before promoting.",
+      "source": "cli",
+      "judgedAt": "2026-07-15T02:19:43.614Z"
+    },
+    {
+      "id": "tmrlgdufgrg",
+      "date": "2026-07-15T02:20:42.700Z",
+      "target": "gameboy",
+      "prompt": "a boss monster made of living crystal, inspired by Wario Land",
+      "seed": 13833,
+      "model": "flux",
+      "a": {
+        "model": "flux",
+        "spriteSize": "16x16",
+        "pipeline": "enhanced",
+        "downscale": null,
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "standard"
+      },
+      "b": {
+        "model": "flux",
+        "spriteSize": "16x16",
+        "pipeline": "enhanced",
+        "downscale": "k-centroid",
+        "dithering": null,
+        "outlines": true,
+        "cleanup": true,
+        "autoCrop": true,
+        "preprocessing": "standard"
+      },
+      "winner": "b",
+      "notes": "Second gameboy downscale trial, different prompt/seed, explicit mode-vs-k-centroid champion reset (earlier auto-picked champion had silently inherited k-centroid from the prior verdict -- watch for this when re-testing an axis that already won). A (mode) is a readable but flat monochrome silhouette. B (k-centroid) keeps the same silhouette and edge cleanliness but uses more of the 4-shade Game Boy palette (a mid-tone shading patch, a distinct dark eye pixel) instead of collapsing near-tied tile colors to a single flat green -- better hardware-palette utilization at no readability cost. Second decisive win for k-centroid on gameboy; promoting gameboy-tiny's recipe.",
+      "source": "cli",
+      "judgedAt": "2026-07-15T02:21:10.405Z"
     }
   ]
 }
